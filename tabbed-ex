@@ -54,7 +54,7 @@
 ## 7. Tabs can be named with Shift+Up (Enter to confirm, Escape to
 ##    cancel).
 ##
-## 8. "[NEW]" button disabled and autohide on by default.
+## 8. "[NEW]" button disabled by default.
 ##
 
 
@@ -349,7 +349,7 @@ sub on_init {
    $self->{tab_title} =
       ($self->x_resource ('title') or 'true') !~ /^(?:false|0|no)/i;
    $self->{autohide} =
-      ($self->x_resource ('autohide') or 'true') !~ /^(?:false|0|no)/i;
+      ($self->x_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
