@@ -154,7 +154,7 @@ sub new_tab {
    $self->{tabheight} = $self->{maxtabheight}
    unless $self->{autohide} && !(defined $self->{tabs} && @{ $self->{tabs} });
 
-   # save a backlink to us, make sure tabbed is inactive
+   # save a backlink to us, make sure tabbedex is inactive
    push @urxvt::TERM_INIT, sub {
       my ($term) = @_;
       $term->{parent} = $self;
@@ -166,10 +166,10 @@ sub new_tab {
             if defined $value;
       }
 
-      $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . ",-tabbed");
+      $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . ",-tabbedex");
    };
 
-   push @urxvt::TERM_EXT, urxvt::ext::tabbed::tab::;
+   push @urxvt::TERM_EXT, urxvt::ext::tabbedex::tab::;
 
    my $term = new urxvt::term
       $self->env, $urxvt::RXVTNAME,
@@ -525,10 +525,10 @@ sub tab_add_lines {
 
 
 
-package urxvt::ext::tabbed::tab;
+package urxvt::ext::tabbedex::tab;
 
 # helper extension implementing the subwindows of a tabbed terminal.
-# simply proxies all interesting calls back to the tabbed class.
+# simply proxies all interesting calls back to the tabbedex class.
 
 {
    for my $hook qw(start destroy key_press property_notify add_lines) {
