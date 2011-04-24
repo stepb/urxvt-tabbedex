@@ -61,6 +61,10 @@
 ## 9. Ability to start a new tab or cycle through tabs via user
 ##    commands: tabbedex:(new|next|prev)_tab .
 ##
+## 10. Fix an issue whereby on_user_command would not properly get sent
+##     to other extension packages if the mouse was not over the urxvt
+##     window.
+##
 
 
 sub update_autohide {
@@ -366,6 +370,8 @@ sub on_start {
    $self->{maxtabheight} = $self->int_bwidth + $self->fheight + $self->lineSpace;
    $self->{tabheight} = $self->{autohide} ? 0 : $self->{maxtabheight};
 
+   $self->{running_user_command} = 0;
+
    $self->cmd_parse ("\033[?25l");
 
    my @argv = $self->argv;
@@ -399,6 +405,15 @@ sub on_configure_notify {
    $self->refresh;
 
    ();
+}
+
+
+sub on_user_command {
+  my ($self, $event) = @_;
+
+  $self->{cur}->{term}->{parent}->tab_user_command($self->{cur}, $event);
+
+  ();
 }
 
 
@@ -538,8 +553,17 @@ sub tab_user_command {
   elsif ($cmd eq 'tabbedex:prev_tab') {
     $self->change_tab($tab, -1);
   }
+  else {
+    # Proxy the user command through to the tab's term, while taking care not
+    # to get caught in an infinite loop.
+    if ($self->{running_user_command} == 0) {
+      $self->{running_user_command} = 1;
+      urxvt::invoke($tab->{term}, 20, $cmd);
+      $self->{running_user_command} = 0;
+    }
+  }
 
-  ()
+  ();
 }
 
 sub change_tab {
@@ -550,7 +574,7 @@ sub change_tab {
   $idx += $direction;
   $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
 
-  ()
+  ();
 }
 
 package urxvt::ext::tabbedex::tab;
