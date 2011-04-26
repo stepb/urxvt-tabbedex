@@ -56,6 +56,15 @@
 ##
 ## 8. "[NEW]" button disabled by default.
 ##
+## Added by Steven Merrill <steven dot merrill at gmail.com>
+##
+## 9. Ability to start a new tab or cycle through tabs via user
+##    commands: tabbedex:(new|next|prev)_tab .
+##
+## 10. Fix an issue whereby on_user_command would not properly get sent
+##     to other extension packages if the mouse was not over the urxvt
+##     window.
+##
 
 
 sub update_autohide {
@@ -361,6 +370,8 @@ sub on_start {
    $self->{maxtabheight} = $self->int_bwidth + $self->fheight + $self->lineSpace;
    $self->{tabheight} = $self->{autohide} ? 0 : $self->{maxtabheight};
 
+   $self->{running_user_command} = 0;
+
    $self->cmd_parse ("\033[?25l");
 
    my @argv = $self->argv;
@@ -394,6 +405,15 @@ sub on_configure_notify {
    $self->refresh;
 
    ();
+}
+
+
+sub on_user_command {
+  my ($self, $event) = @_;
+
+  $self->{cur}->{term}->{parent}->tab_user_command($self->{cur}, $event);
+
+  ();
 }
 
 
@@ -466,10 +486,7 @@ sub tab_key_press {
    if ($event->{state} & urxvt::ShiftMask) {
       if ($keysym == 0xff51 || $keysym == 0xff53) {
          if (@{ $self->{tabs} } > 1) {
-            my $idx = 0;
-            ++$idx while $self->{tabs}[$idx] != $tab;
-            $idx += $keysym - 0xff52;
-            $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
+            $self->change_tab($tab, $keysym - 0xff52);
          }
          return 1;
 
@@ -524,6 +541,41 @@ sub tab_add_lines {
 }
 
 
+sub tab_user_command {
+  my ($self, $tab, $cmd) = @_;
+
+  if ($cmd eq 'tabbedex:new_tab') {
+    $self->new_tab;
+  }
+  elsif ($cmd eq 'tabbedex:next_tab') {
+    $self->change_tab($tab, 1);
+  }
+  elsif ($cmd eq 'tabbedex:prev_tab') {
+    $self->change_tab($tab, -1);
+  }
+  else {
+    # Proxy the user command through to the tab's term, while taking care not
+    # to get caught in an infinite loop.
+    if ($self->{running_user_command} == 0) {
+      $self->{running_user_command} = 1;
+      urxvt::invoke($tab->{term}, 20, $cmd);
+      $self->{running_user_command} = 0;
+    }
+  }
+
+  ();
+}
+
+sub change_tab {
+  my ($self, $tab, $direction) = @_;
+
+  my $idx = 0;
+  ++$idx while $self->{tabs}[$idx] != $tab;
+  $idx += $direction;
+  $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
+
+  ();
+}
 
 package urxvt::ext::tabbedex::tab;
 
@@ -531,7 +583,7 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy key_press property_notify add_lines) {
+   for my $hook qw(start destroy user_command key_press property_notify add_lines) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
