@@ -411,7 +411,7 @@ sub on_configure_notify {
 sub on_user_command {
   my ($self, $event) = @_;
 
-  $self->{cur}->{term}->{parent}->tab_user_command($self->{cur}, $event);
+  $self->{cur}->{term}->{parent}->tab_user_command($self->{cur}, $event, 1);
 
   ();
 }
@@ -542,7 +542,7 @@ sub tab_add_lines {
 
 
 sub tab_user_command {
-  my ($self, $tab, $cmd) = @_;
+  my ($self, $tab, $cmd, $proxy_events) = @_;
 
   if ($cmd eq 'tabbedex:new_tab') {
     $self->new_tab;
@@ -556,7 +556,7 @@ sub tab_user_command {
   else {
     # Proxy the user command through to the tab's term, while taking care not
     # to get caught in an infinite loop.
-    if ($self->{running_user_command} == 0) {
+    if ($proxy_events && $self->{running_user_command} == 0) {
       $self->{running_user_command} = 1;
       urxvt::invoke($tab->{term}, 20, $cmd);
       $self->{running_user_command} = 0;
