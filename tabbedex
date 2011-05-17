@@ -14,8 +14,9 @@
 #
 ##
 ## Tabbed plugin for rxvt-unicode
-## Modified by Michal Nazarewicz (mina86/AT/mina86.com) and
-## StephenB (mail4stb/AT/gmail.com)
+## Modified by Michal Nazarewicz (mina86/AT/mina86.com), StephenB
+## (mail4stb/AT/gmail.com) and Steven Merrill
+## <steven dot merrill at gmail.com>
 ##
 ## The following has been added:
 ##
@@ -60,6 +61,8 @@
 ##
 ## 9. Ability to start a new tab or cycle through tabs via user
 ##    commands: tabbedex:(new|next|prev)_tab .
+##    e.g. (in .Xdefaults) URxvt.keysym.M-t: perl:tabbedex:new_tab
+##    (see the urxvt man file for more info about keysym)
 ##
 ## 10. Fix an issue whereby on_user_command would not properly get sent
 ##     to other extension packages if the mouse was not over the urxvt
