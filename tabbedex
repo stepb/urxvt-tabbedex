@@ -74,6 +74,9 @@
 ##     tabbedex:move_tab_(left|right).
 ##     e.g. (see 9.) URxvt.keysym.C-S-Left: perl:tabbex:move_tab_left
 ##
+## 12. Ability to disable the default keybindings using the
+##     no-tabbedex-keys resource.
+##
 
 
 sub update_autohide {
@@ -368,6 +371,8 @@ sub on_init {
       ($self->x_resource ('title') or 'true') !~ /^(?:false|0|no)/i;
    $self->{autohide} =
       ($self->x_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{no_default_keys} =
+      ($self->x_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
@@ -491,6 +496,8 @@ sub tab_key_press {
       $self->refresh;
       return 1;
    }
+
+   return () if ($self->{no_default_keys});
 
    if ($event->{state} & urxvt::ShiftMask) {
       if ($keysym == 0xff51 || $keysym == 0xff53) {
