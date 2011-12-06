@@ -15,8 +15,9 @@
 ##
 ## Tabbed plugin for rxvt-unicode
 ## Modified by Michal Nazarewicz (mina86/AT/mina86.com), StephenB
-## (mail4stb/AT/gmail.com) and Steven Merrill
-## <steven dot merrill at gmail.com>
+## (mail4stb/AT/gmail.com), Steven Merrill
+## <steven dot merrill at gmail.com> and Mark Pustjens
+## <pustjens@dds.nl>
 ##
 ## The following has been added:
 ##
@@ -77,6 +78,11 @@
 ## 12. Ability to disable the default keybindings using the
 ##     no-tabbedex-keys resource.
 ##
+## Added by Mark Pustjens <pustjens@dds.nl>
+##
+## 13. Ability to prevent the last tab from closing.
+##     Use the following in your ~/.Xdefaults to enable:
+##     URXvt.tabbed.noexit: yes
 
 
 sub update_autohide {
@@ -378,6 +384,8 @@ sub on_init {
       ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
    $self->{no_default_keys} =
       ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
+    $self->{no_exit} =
+      ($self->my_resource ('no-exit') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
@@ -459,6 +467,11 @@ sub tab_start {
 
 sub tab_destroy {
    my ($self, $tab) = @_;
+
+   if ($self->{no_exit} && $#{ $self->{tabs} } == 0) {
+      $self->new_tab;
+      $self->make_current ($self->{tabs}[-1]);
+   }
 
    $self->{tabs} = [ grep $_ != $tab, @{ $self->{tabs} } ];
    $self->update_autohide ();
