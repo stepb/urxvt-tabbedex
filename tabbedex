@@ -255,7 +255,7 @@ sub copy_properties {
 
 sub my_resource {
    my $self = shift;
-   $self->x_resource ("tabbed.$_[0]");
+   $self->x_resource ("tabbedex.$_[0]");
 }
 
 
