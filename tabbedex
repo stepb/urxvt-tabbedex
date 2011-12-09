@@ -193,7 +193,7 @@ sub new_tab {
             if defined $value;
       }
 
-      $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . ",-tabbedex");
+      $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . $self->{perl_ext_blacklist});
    };
 
    push @urxvt::TERM_EXT, urxvt::ext::tabbedex::tab::;
@@ -386,6 +386,11 @@ sub on_init {
       ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
    $self->{reopen_on_close} =
       ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
+
+   my @blacklist = split(',', $self->my_resource ('perl-ext-blacklist'));
+   unshift @blacklist, ",-tabbedex";
+   $self->{perl_ext_blacklist} = join (",-", @blacklist);
+
 
    ();
 }
