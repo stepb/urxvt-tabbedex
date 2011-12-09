@@ -122,6 +122,11 @@
 ##    I've changed it so that it can be configured and thus not break
 ##    backwards compatibility with older tabbedex versions.]
 ##
+## * Ability to blacklist more extensions from being loaded in the
+##   slave tabs apart from the hard coded tabbedex.  This is done with
+##   a perl-ext-blacklist resource, which is a comma separated list of
+##   extensions that must not be loaded into the slave terminals.
+##
 ## Added by Jim Diamond <Jim dot Diamond at acadiau dot ca>:
 ##
 ## * Previous versions did not autohide the tab bar if the remaining
@@ -329,7 +334,8 @@ sub new_tab {
       }
 
       $term->resource (perl_ext_2 =>
-                       $term->resource ("perl_ext_2") . ",-tabbedex");
+                       $term->resource ('perl_ext_2') .
+                       $self->{perl_ext_blacklist});
 
       $self->register_keysyms($term);
    };
@@ -562,6 +568,9 @@ sub on_init {
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
 
    $self->register_keysyms;
+
+   my @blacklist = split(',', $self->rs_text ('perl-ext-blacklist'));
+   $self->{perl_ext_blacklist} = join (',-', ',-tabbedex', @blacklist);
 
    ();
 }
