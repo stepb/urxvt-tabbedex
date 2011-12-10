@@ -68,6 +68,15 @@
 ##     to other extension packages if the mouse was not over the urxvt
 ##     window.
 ##
+## Added by Thomas Jost:
+##
+## 11. Add several user commands: tabbedex:rename_tab,
+##     tabbedex:move_tab_(left|right).
+##     e.g. (see 9.) URxvt.keysym.C-S-Left: perl:tabbex:move_tab_left
+##
+## 12. Ability to disable the default keybindings using the
+##     no-tabbedex-keys resource.
+##
 
 
 sub update_autohide {
@@ -362,6 +371,8 @@ sub on_init {
       ($self->x_resource ('title') or 'true') !~ /^(?:false|0|no)/i;
    $self->{autohide} =
       ($self->x_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{no_default_keys} =
+      ($self->x_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
@@ -486,6 +497,8 @@ sub tab_key_press {
       return 1;
    }
 
+   return () if ($self->{no_default_keys});
+
    if ($event->{state} & urxvt::ShiftMask) {
       if ($keysym == 0xff51 || $keysym == 0xff53) {
          if (@{ $self->{tabs} } > 1) {
@@ -498,25 +511,12 @@ sub tab_key_press {
          return 1;
 
       } elsif ($keysym == 0xff52) {
-         $tab->{is_inputting_name} = 1;
-         $tab->{old_name} = $tab->{name} ? $tab->{name} : "";
-         $tab->{new_name} = "";
-         $tab->{name} = "█";
-         $self->update_autohide (1);
-         $self->refresh;
+         $self->rename_tab($tab);
          return 1;
       }
    } elsif ($event->{state} & urxvt::ControlMask) {
       if ($keysym == 0xff51 || $keysym == 0xff53) {
-         if (@{ $self->{tabs} } > 1) {
-            my $idx1 = 0;
-            ++$idx1 while $self->{tabs}[$idx1] != $tab;
-            my $idx2 = ($idx1 + $keysym - 0xff52) % @{ $self->{tabs} };
-
-            ($self->{tabs}[$idx1], $self->{tabs}[$idx2]) =
-                ($self->{tabs}[$idx2], $self->{tabs}[$idx1]);
-            $self->make_current ($self->{tabs}[$idx2]);
-         }
+         $self->move_tab($tab, $keysym - 0xff52);
          return 1;
       }
    }
@@ -556,6 +556,15 @@ sub tab_user_command {
   elsif ($cmd eq 'tabbedex:prev_tab') {
     $self->change_tab($tab, -1);
   }
+  elsif ($cmd eq 'tabbedex:move_tab_left') {
+    $self->move_tab($tab, -1);
+  }
+  elsif ($cmd eq 'tabbedex:move_tab_right') {
+    $self->move_tab($tab, 1);
+  }
+  elsif ($cmd eq 'tabbedex:rename_tab') {
+    $self->rename_tab($tab);
+  }
   else {
     # Proxy the user command through to the tab's term, while taking care not
     # to get caught in an infinite loop.
@@ -576,6 +585,35 @@ sub change_tab {
   ++$idx while $self->{tabs}[$idx] != $tab;
   $idx += $direction;
   $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
+
+  ();
+}
+
+sub move_tab {
+  my ($self, $tab, $direction) = @_;
+
+  if (@{ $self->{tabs} } > 1) {
+    my $idx1 = 0;
+    ++$idx1 while $self->{tabs}[$idx1] != $tab;
+    my $idx2 = ($idx1 + $direction) % @{ $self->{tabs} };
+
+    ($self->{tabs}[$idx1], $self->{tabs}[$idx2]) =
+      ($self->{tabs}[$idx2], $self->{tabs}[$idx1]);
+    $self->make_current ($self->{tabs}[$idx2]);
+  }
+
+  ();
+}
+
+sub rename_tab {
+  my ($self, $tab) = @_;
+
+  $tab->{is_inputting_name} = 1;
+  $tab->{old_name} = $tab->{name} ? $tab->{name} : "";
+  $tab->{new_name} = "";
+  $tab->{name} = "█";
+  $self->update_autohide (1);
+  $self->refresh;
 
   ();
 }
