@@ -15,8 +15,8 @@
 ##
 ## Tabbed plugin for rxvt-unicode
 ## Modified by Michal Nazarewicz (mina86/AT/mina86.com), StephenB
-## (mail4stb/AT/gmail.com) and Steven Merrill
-## <steven dot merrill at gmail.com>
+## (mail4stb/AT/gmail.com), Steven Merrill
+## <steven dot merrill at gmail.com> and more...
 ##
 ## The following has been added:
 ##
@@ -80,6 +80,10 @@
 ## Added by xanf (Illya Klymov):
 ##
 ## 13. Ability to display non-latin characters in tab title.
+##
+## Added by jpkotta:
+##
+## 14. Tabs inherit command line options.
 ##
 
 use Encode qw(decode);
@@ -190,6 +194,11 @@ sub new_tab {
 
          $term->resource ("+$_" => $value)
             if defined $value;
+      }
+
+      foreach my $opt (keys %urxvt::OPTION) {
+          my $value = $self->{option}{$opt};
+          $term->option($urxvt::OPTION{$opt}, $value);
       }
 
       $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . ",-tabbedex");
@@ -336,6 +345,12 @@ sub on_init {
    $self->resource (name => "URxvt.tabbed");
    $self->resource (pty_fd => -1);
 
+   $self->{option} = {};
+   for my $key (keys %urxvt::OPTION) {
+       $self->{option}{$key} = $self->option($urxvt::OPTION{$key});
+   }
+
+   # this is for the tabs terminal; order is important
    $self->option ($urxvt::OPTION{scrollBar}, 0);
 
    my $fg    = $self->x_resource ("tabbar-fg");
