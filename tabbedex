@@ -16,7 +16,8 @@
 ## Tabbed plugin for rxvt-unicode
 ## Modified by Michal Nazarewicz (mina86/AT/mina86.com), StephenB
 ## (mail4stb/AT/gmail.com), Steven Merrill
-## <steven dot merrill at gmail.com> and more...
+## <steven dot merrill at gmail.com>, Mark Pustjens
+## <pustjens@dds.nl> and more...
 ##
 ## The following has been added:
 ##
@@ -84,6 +85,14 @@
 ## Added by jpkotta:
 ##
 ## 14. Tabs inherit command line options.
+##
+## Added by Mark Pustjens <pustjens@dds.nl>
+##
+## 15. Resources are now read respecting the -name option.
+##
+## 16. Ability to prevent the last tab from closing.
+##     Use the following in your ~/.Xdefaults to enable:
+##     URXvt.tabbed.reopen-on-close: yes
 ##
 
 use Encode qw(decode);
@@ -398,6 +407,8 @@ sub on_init {
       ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
    $self->{no_default_keys} =
       ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
+    $self->{reopen_on_close} =
+      ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
@@ -479,6 +490,11 @@ sub tab_start {
 
 sub tab_destroy {
    my ($self, $tab) = @_;
+
+   if ($self->{reopen_on_close} && $#{ $self->{tabs} } == 0) {
+      $self->new_tab;
+      $self->make_current ($self->{tabs}[-1]);
+   }
 
    $self->{tabs} = [ grep $_ != $tab, @{ $self->{tabs} } ];
    $self->update_autohide ();
