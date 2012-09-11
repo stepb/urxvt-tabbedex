@@ -15,8 +15,9 @@
 ##
 ## Tabbed plugin for rxvt-unicode
 ## Modified by Michal Nazarewicz (mina86/AT/mina86.com), StephenB
-## (mail4stb/AT/gmail.com) and Steven Merrill
-## <steven dot merrill at gmail.com>
+## (mail4stb/AT/gmail.com), Steven Merrill
+## <steven dot merrill at gmail.com> and Mark Pustjens
+## <pustjens@dds.nl>
 ##
 ## The following has been added:
 ##
@@ -77,6 +78,11 @@
 ## 12. Ability to disable the default keybindings using the
 ##     no-tabbedex-keys resource.
 ##
+## Added by Mark Pustjens <pustjens@dds.nl>
+##
+## 13. Ability to prevent the last tab from closing.
+##     Use the following in your ~/.Xdefaults to enable:
+##     URXvt.tabbed.noexit: yes
 
 
 sub update_autohide {
@@ -187,7 +193,7 @@ sub new_tab {
             if defined $value;
       }
 
-      $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . ",-tabbedex");
+      $term->resource (perl_ext_2 => $term->resource ("perl_ext_2") . $self->{perl_ext_blacklist});
    };
 
    push @urxvt::TERM_EXT, urxvt::ext::tabbedex::tab::;
@@ -250,6 +256,12 @@ sub copy_properties {
 
    # pass 2, delete all extraneous properties
    $self->XDeleteProperty ($self->parent, $_) for keys %$current;
+}
+
+
+sub my_resource {
+   my $self = shift;
+   $self->x_resource ("tabbedex.$_[0]");
 }
 
 
@@ -328,17 +340,16 @@ sub on_init {
    $self->{resource} = [map $self->resource ("+$_"), 0 .. urxvt::NUM_RESOURCES - 1];
 
    $self->resource (int_bwidth => 0);
-   $self->resource (name => "URxvt.tabbed");
    $self->resource (pty_fd => -1);
 
    $self->option ($urxvt::OPTION{scrollBar}, 0);
 
-   my $fg    = $self->x_resource ("tabbar-fg");
-   my $bg    = $self->x_resource ("tabbar-bg");
-   my $tabfg = $self->x_resource ("tab-fg");
-   my $tabbg = $self->x_resource ("tab-bg");
-   my $titfg = $self->x_resource ("title-fg");
-   my $titbg = $self->x_resource ("title-bg");
+   my $fg    = $self->my_resource ("tabbar-fg");
+   my $bg    = $self->my_resource ("tabbar-bg");
+   my $tabfg = $self->my_resource ("tab-fg");
+   my $tabbg = $self->my_resource ("tab-bg");
+   my $titfg = $self->my_resource ("title-fg");
+   my $titbg = $self->my_resource ("title-bg");
 
    defined $fg    or $fg    = 3;
    defined $bg    or $bg    = 0;
@@ -352,7 +363,7 @@ sub on_init {
    $self->{rs_title}  = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $titfg + 2, $titbg + 2);
 
 
-   my $timeouts = $self->x_resource ("tabbar-timeouts");
+   my $timeouts = $self->my_resource ("tabbar-timeouts");
    $timeouts = '16:.:8:::4:+' unless defined $timeouts;
    if ($timeouts ne '') {
       my @timeouts;
@@ -366,13 +377,20 @@ sub on_init {
    }
 
    $self->{new_button} =
-      ($self->x_resource ('new-button') or 'false') !~ /^(?:false|0|no)/i;
+      ($self->my_resource ('new-button') or 'false') !~ /^(?:false|0|no)/i;
    $self->{tab_title} =
-      ($self->x_resource ('title') or 'true') !~ /^(?:false|0|no)/i;
+      ($self->my_resource ('title') or 'true') !~ /^(?:false|0|no)/i;
    $self->{autohide} =
-      ($self->x_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
+      ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
    $self->{no_default_keys} =
-      ($self->x_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
+      ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{reopen_on_close} =
+      ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
+
+   my @blacklist = split(',', $self->my_resource ('perl-ext-blacklist'));
+   unshift @blacklist, ",-tabbedex";
+   $self->{perl_ext_blacklist} = join (",-", @blacklist);
+
 
    ();
 }
@@ -454,6 +472,11 @@ sub tab_start {
 
 sub tab_destroy {
    my ($self, $tab) = @_;
+
+   if ($self->{reopen_on_close} && $#{ $self->{tabs} } == 0) {
+      $self->new_tab;
+      $self->make_current ($self->{tabs}[-1]);
+   }
 
    $self->{tabs} = [ grep $_ != $tab, @{ $self->{tabs} } ];
    $self->update_autohide ();
