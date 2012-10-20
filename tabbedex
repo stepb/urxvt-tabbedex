@@ -131,7 +131,7 @@ sub refresh {
    my ($self) = @_;
 
    # autohide makes it zero
-   return unless $self->{tabheight};
+   return unless $self->{tabheight} || !$self->{tab_as_line};
 
    my $ncol = $self->ncol;
 
@@ -146,25 +146,35 @@ sub refresh {
       push @ofs, [0, 6, -1 ];
       $ofs = 7;
    }
-
+   my $color_tab = 2; # avoid white and black (1,2)
+   my $indice_color = 0;
    for my $tab (@{ $self->{tabs} }) {
-      my $name = $tab->{name} ? $tab->{name} : $idx;
+      my $name = $self->{tab_as_line} ? "  " : ($tab->{name} ? $tab->{name} : $idx);
       my $act = $self->tab_activity_mark($tab);
       my $txt = sprintf "%s%s%s", $act, $name, $act;
       my $len = length $txt;
-
-      substr $text, $ofs, $len + 1, "$txt|";
-      @$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
-         if $tab == $self->{cur};
-
-      push @ofs, [ $ofs, $ofs + $len, $idx ];
+      if (!$self->{tab_as_line}) {
+         substr $text, $ofs, $len + 1, "$txt|";
+      }
+      if(!$self->{multicolor}){
+         @$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
+            if $tab == $self->{cur};
+            push @ofs, [ $ofs, $ofs + $len, $idx ];
+      } else {
+         #@$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
+         $color_tab = (($color_tab+1)%9==0) ? 3 : $color_tab+1; # avoid whites and blacks
+         $indice_color += (($indice_color+1*$color_tab)%9==0) ? 3 : +1; 
+         @$rend[$ofs .. $ofs + $len -1] = ($tab != $self->{cur} ? $color_tab*$indice_color : 256) x $len; # ($idx+1) #avoid black and *5+1 avoid whites
+         push @ofs, [ $ofs, $ofs + $len, $idx ];
+         $ofs -=1;
+      }
       ++$idx;
       $ofs += $len + 1;
    }
 
    substr $text, --$ofs, 1, ' '; # remove last '|'
 
-   if ($self->{tab_title} && $ofs + 3 < $ncol) {
+   if ($self->{tab_title} && !$self->{tab_as_line} &&$ofs + 3 < $ncol) {
       my $term = $self->{term};
       my @str = $term->XGetWindowProperty($term->parent, $self->{tab_title});
       if (@str && $str[2]) {
@@ -407,8 +417,12 @@ sub on_init {
       ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
    $self->{no_default_keys} =
       ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
-    $self->{reopen_on_close} =
+   $self->{reopen_on_close} =
       ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{tab_as_line} =
+      ($self->my_resource ('tab-as-line') or 'false') !~ /^(?:false|0|no)/i;   
+   $self->{multicolor} =
+      ($self->my_resource ('multicolor') or 'false') !~ /^(?:false|0|no)/i;   
 
    ();
 }
@@ -417,7 +431,7 @@ sub on_init {
 sub on_start {
    my ($self) = @_;
 
-   $self->{maxtabheight} = $self->int_bwidth + $self->fheight + $self->lineSpace;
+   $self->{maxtabheight} = $self->{tab_as_line} ? 6 : ($self->int_bwidth + $self->fheight + $self->lineSpace);
    $self->{tabheight} = $self->{autohide} ? 0 : $self->{maxtabheight};
 
    $self->{running_user_command} = 0;
@@ -551,7 +565,7 @@ sub tab_key_press {
          $self->new_tab;
          return 1;
 
-      } elsif ($keysym == 0xff52) {
+      } elsif (!$self->{tab_as_line} && $keysym == 0xff52) {
          $self->rename_tab($tab);
          return 1;
       }
