@@ -573,6 +573,9 @@ sub tab_key_press {
       if ($keysym == 0xff51 || $keysym == 0xff53) {
          $self->move_tab($tab, $keysym - 0xff52);
          return 1;
+      } elsif ($keysym >= 0x0031 && $keysym <= 0x0039){
+         $self->change_to_tab($tab, $keysym - 0x0031);
+         return 1;
       }
    }
 
@@ -644,6 +647,15 @@ sub change_tab {
   ();
 }
 
+sub change_to_tab {
+  my ($self, $tab, $idx) = @_;
+  if($idx < @{$self->{tabs}}){
+    $self->make_current ($self->{tabs}[$idx]);
+  }
+
+  ();
+}
+
 sub move_tab {
   my ($self, $tab, $direction) = @_;
 
@@ -690,3 +702,4 @@ package urxvt::ext::tabbedex::tab;
       die if $@;
    }
 }
+
