@@ -659,13 +659,35 @@ sub rename_tab {
   ();
 }
 
+# At least in urxvt 9.12:
+# arg2 is /urxvt::ext::tabbedex::tab=HASH(0x20625b0)/  ( == $self->{tab} )
+# arg3 is the actual OSC argument
+# Some other modules (at least overlay_osc) get the OSC argument in arg2
+# and nothing in arg3.
+sub tab_osc_seq_perl {
+    my ($self, $tab, $osc) = @_;
+
+    return unless $osc =~ s/^tabbedex;//;
+
+    $osc =~ s/^([^;]+)+;//
+	or return;
+
+    if ($1 eq "set_tab_name") {
+	my ($new_name) = split /;/, $osc, 1;
+	$tab->{name} = $new_name;
+	$self->refresh;
+    }
+
+    1;
+}
+
 package urxvt::ext::tabbedex::tab;
 
 # helper extension implementing the subwindows of a tabbed terminal.
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy user_command key_press property_notify add_lines) {
+   for my $hook qw(osc_seq_perl start destroy user_command key_press property_notify add_lines) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
