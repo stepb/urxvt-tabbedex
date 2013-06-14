@@ -119,12 +119,13 @@ sub update_autohide {
 }
 
 
-sub tab_activity_mark ($$) {
-   my ($self, $tab) = @_;
+sub tab_activity_mark ($$;$) {
+   my ($self, $tab, $now) = @_;
    return ' ' unless defined $tab->{lastActivity};
    return ' ' if $tab == $self->{cur};
+   $now //= int urxvt::NOW;
    if (defined $self->{timeouts}) {
-      my $diff = int urxvt::NOW - $tab->{lastActivity};
+      my $diff = $now - $tab->{lastActivity};
       for my $spec (@{ $self->{timeouts} }) {
          return $spec->[1] if $diff > $spec->[0];
       }
@@ -153,9 +154,10 @@ sub refresh {
       $ofs = 7;
    }
 
+   my $now = int urxvt::NOW;
    for my $tab (@{ $self->{tabs} }) {
       my $name = $tab->{name} ? $tab->{name} : $idx;
-      my $act = $self->tab_activity_mark($tab);
+      my $act = $self->tab_activity_mark($tab, $now);
       my $txt = sprintf "%s%s%s", $act, $name, $act;
       my $len = length $txt;
 
@@ -583,11 +585,12 @@ sub tab_property_notify {
 
 
 sub tab_add_lines {
-   my ($self, $tab) = @_;
-   my $mark = $self->tab_activity_mark($tab);
-   $tab->{lastActivity} = int urxvt::NOW;
-   $self->refresh if $mark ne $self->tab_activity_mark($tab);
-   ();
+    my ($self, $tab) = @_;
+    my $now = int urxvt::NOW;
+    my $mark = $self->tab_activity_mark($tab, $now);
+    $tab->{lastActivity} = $now;
+    $self->refresh if $mark ne $self->tab_activity_mark($tab, $now);
+    ();
 }
 
 
