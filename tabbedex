@@ -146,11 +146,11 @@ sub tab_bell_active ($$$) {
 
 sub tab_activity_mark ($$;$) {
    my ($self, $tab, $now) = @_;
-   return ' ' unless defined $tab->{lastActivity};
+   return ' ' unless defined $tab->{last_activity};
    return ' ' if $tab == $self->{cur};
    $now = $now // int urxvt::NOW;
    if (defined $self->{timeouts}) {
-      my $diff = $now - $tab->{lastActivity};
+      my $diff = $now - $tab->{last_activity};
       for my $spec (@{ $self->{timeouts} }) {
          return $spec->[1] if $diff >= $spec->[0];
       }
@@ -351,7 +351,7 @@ sub make_current {
    my ($self, $tab) = @_;
 
    if (my $cur = $self->{cur}) {
-      delete $cur->{lastActivity};
+      delete $cur->{last_activity};
       delete $cur->{bell_rung};
       $cur->XUnmapWindow ($cur->parent) if $cur->mapped;
       $cur->focus_out;
@@ -366,7 +366,7 @@ sub make_current {
    $tab->focus_in if $self->focus;
 
    $tab->XMapWindow ($tab->parent);
-   delete $tab->{lastActivity};
+   delete $tab->{last_activity};
    delete $tab->{bell_rung};
    $self->refresh;
 
@@ -652,7 +652,7 @@ sub tab_add_lines {
     my ($self, $tab) = @_;
     my $now = int urxvt::NOW;
     my $mark = $self->tab_activity_mark($tab, $now);
-    $tab->{lastActivity} = $now;
+    $tab->{last_activity} = $now;
     $self->refresh if $mark ne $self->tab_activity_mark($tab, $now);
     ();
 }
