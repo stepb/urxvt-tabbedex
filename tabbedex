@@ -127,7 +127,7 @@ sub tab_activity_mark ($$;$) {
    if (defined $self->{timeouts}) {
       my $diff = $now - $tab->{lastActivity};
       for my $spec (@{ $self->{timeouts} }) {
-         return $spec->[1] if $diff > $spec->[0];
+         return $spec->[1] if $diff >= $spec->[0];
       }
    }
    '*';
