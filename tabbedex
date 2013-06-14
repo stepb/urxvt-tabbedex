@@ -34,8 +34,10 @@
 ##
 ##     ( <timeout> ":" <character> ":" )* <timeout> ":" <character> ":"
 ##
-##   where <timeout> is timeout in seconds and <character> is
-##   a single activity character.
+##   where <timeout> is timeout in seconds and <character> is a single
+##   activity character.  If activity character is (, [, { or < it
+##   will be used as left activity mark and matching character will be
+##   used on the right side.
 ##
 ## * The "[NEW]" button can be disabled (who on Earth uses mouse to
 ##   create new tab anyways?) by setting new-button resource to yes.
@@ -133,6 +135,21 @@ sub tab_activity_mark ($$;$) {
    '*';
 }
 
+{
+
+my %matching_activity_marks = (
+    '[' => ']',
+    '{' => '}',
+    '(' => ')',
+    '<' => '>',
+);
+
+sub matching_activity_mark {
+    return $matching_activity_marks{$_[0]} // $_[0];
+}
+
+}
+
 
 sub refresh {
    my ($self) = @_;
@@ -158,7 +175,7 @@ sub refresh {
    for my $tab (@{ $self->{tabs} }) {
       my $name = $tab->{name} ? $tab->{name} : $idx;
       my $act = $self->tab_activity_mark($tab, $now);
-      my $txt = sprintf "%s%s%s", $act, $name, $act;
+      my $txt = sprintf "%s%s%s", $act, $name, matching_activity_mark $act;
       my $len = length $txt;
 
       substr $text, $ofs, $len + 1, "$txt|";
