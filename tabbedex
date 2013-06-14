@@ -39,6 +39,17 @@
 ##   will be used as left activity mark and matching character will be
 ##   used on the right side.
 ##
+## * If bell is ringing on a given tab it is shown on the tab bar
+##   using bell-{fg,bg} colours (if its inactive) or bell-tab-{fg,bg}
+##   if its the current tab.
+##
+##   If bell is rung on an inactive cell it is said to be ringing
+##   until that cell is selected.  If bell is rung on an active cell,
+##   it is said to be ringing for bell-timeout seconds.
+##
+##   This functionality is actually even better than activity markers
+##   if one adds \a to $PS1.
+##
 ## * The "[NEW]" button can be disabled (who on Earth uses mouse to
 ##   create new tab anyways?) by setting new-button resource to yes.
 ##
@@ -121,11 +132,23 @@ sub update_autohide {
 }
 
 
+sub tab_bell_active ($$$) {
+    my ($self, $tab, $now) = @_;
+    if ($tab->{bell_rung}) {
+        if ($tab == $self->{cur}) {
+            return $now - $tab->{bell_rung} < $self->{bell_timeout};
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 sub tab_activity_mark ($$;$) {
    my ($self, $tab, $now) = @_;
    return ' ' unless defined $tab->{lastActivity};
    return ' ' if $tab == $self->{cur};
-   $now //= int urxvt::NOW;
+   $now = $now // int urxvt::NOW;
    if (defined $self->{timeouts}) {
       my $diff = $now - $tab->{lastActivity};
       for my $spec (@{ $self->{timeouts} }) {
@@ -166,7 +189,7 @@ sub refresh {
 
    if ($self->{new_button}) {
       substr $text, 0, 7, "[NEW] |";
-      @$rend[0 .. 5] = ($self->{rs_tab}) x 6;
+      @$rend[0 .. 5] = ($self->{rs_tab}[1]) x 6;
       push @ofs, [0, 6, -1 ];
       $ofs = 7;
    }
@@ -179,8 +202,13 @@ sub refresh {
       my $len = length $txt;
 
       substr $text, $ofs, $len + 1, "$txt|";
-      @$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
-         if $tab == $self->{cur};
+
+      my $color = $self->{rs_tab}[
+         2 * $self->tab_bell_active($tab, $now) + ($tab == $self->{cur})
+      ];
+      if (defined $color) {
+         @$rend[$ofs .. $ofs + $len - 1] = ($color) x $len;
+      }
 
       push @ofs, [ $ofs, $ofs + $len, $idx ];
       ++$idx;
@@ -324,6 +352,7 @@ sub make_current {
 
    if (my $cur = $self->{cur}) {
       delete $cur->{lastActivity};
+      delete $cur->{bell_rung};
       $cur->XUnmapWindow ($cur->parent) if $cur->mapped;
       $cur->focus_out;
    }
@@ -338,6 +367,7 @@ sub make_current {
 
    $tab->XMapWindow ($tab->parent);
    delete $tab->{lastActivity};
+   delete $tab->{bell_rung};
    $self->refresh;
 
    ();
@@ -407,8 +437,13 @@ sub on_init {
    $self->option ($urxvt::OPTION{scrollBar}, 0);
 
    $self->{rs_tabbar} = $self->rs_color ('tabber', 3, 0);
-   $self->{rs_tab}    = $self->rs_color ('tab', 0, 1);
    $self->{rs_title}  = $self->rs_color ('title', 2, 0);
+   $self->{rs_tab}    = [
+      undef,                              # inactive
+      $self->rs_color ('tab', 0, 1),      # active
+      $self->rs_color ('bell', 0, 3),     # bell ringing
+      $self->rs_color ('bell-tab', 5, 4)  # active, bell ringing
+   ];
 
    my $timeouts = $self->my_resource ("tabbar-timeouts");
    $timeouts = '16:.:8:::4:+' unless defined $timeouts;
@@ -422,6 +457,8 @@ sub on_init {
          $self->{timeouts} = [ sort { $b->[0] <=> $a-> [0] } @timeouts ];
       }
    }
+
+   $self->{bell_timeout} = int($self->my_resource ('bell-timeout') // 1);
 
    $self->{new_button} =
       ($self->my_resource ('new-button') or 'false') !~ /^(?:false|0|no)/i;
@@ -601,6 +638,16 @@ sub tab_property_notify {
 }
 
 
+sub tab_bell {
+    my ($self, $tab, $event) = @_;
+    my $now = int urxvt::NOW;
+    my $bell = $self->tab_bell_active($tab, $now);
+    $tab->{bell_rung} = $now;
+    $self->refresh if $bell ne $self->tab_bell_active($tab, $now);
+    ();
+}
+
+
 sub tab_add_lines {
     my ($self, $tab) = @_;
     my $now = int urxvt::NOW;
@@ -691,7 +738,8 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy user_command key_press property_notify add_lines) {
+   for my $hook qw(start destroy user_command key_press property_notify
+                   add_lines bell) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
