@@ -292,6 +292,13 @@ sub my_resource {
    $self->x_resource ("tabbed.$_[0]");
 }
 
+sub rs_color($$$$) {
+   my ($self, $prefix, $def_fg, $def_bg) = @_;
+   my $fg = $self->my_resource ($prefix . '-fg') // $def_fg;
+   my $bg = $self->my_resource ($prefix . '-bg') // $def_bg;
+   urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $fg + 2, $bg + 2);
+}
+
 
 sub make_current {
    my ($self, $tab) = @_;
@@ -380,24 +387,9 @@ sub on_init {
    # this is for the tabs terminal; order is important
    $self->option ($urxvt::OPTION{scrollBar}, 0);
 
-   my $fg    = $self->my_resource ("tabbar-fg");
-   my $bg    = $self->my_resource ("tabbar-bg");
-   my $tabfg = $self->my_resource ("tab-fg");
-   my $tabbg = $self->my_resource ("tab-bg");
-   my $titfg = $self->my_resource ("title-fg");
-   my $titbg = $self->my_resource ("title-bg");
-
-   defined $fg    or $fg    = 3;
-   defined $bg    or $bg    = 0;
-   defined $tabfg or $tabfg = 0;
-   defined $tabbg or $tabbg = 1;
-   defined $titfg or $titfg = 2;
-   defined $titbg or $titbg = 0;
-
-   $self->{rs_tabbar} = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $fg    + 2, $bg    + 2);
-   $self->{rs_tab}    = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $tabfg + 2, $tabbg + 2);
-   $self->{rs_title}  = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $titfg + 2, $titbg + 2);
-
+   $self->{rs_tabbar} = $self->rs_color ('tabber', 3, 0);
+   $self->{rs_tab}    = $self->rs_color ('tab', 0, 1);
+   $self->{rs_title}  = $self->rs_color ('title', 2, 0);
 
    my $timeouts = $self->my_resource ("tabbar-timeouts");
    $timeouts = '16:.:8:::4:+' unless defined $timeouts;
