@@ -122,6 +122,11 @@
 ##   [mina86@mina86.com: Added a fix to temporarily show the tab bar
 ##    if renaming a tab.]
 ##
+## * The name of the current tab can be changed with an escape sequence.
+##     For example, the shell command
+##         printf "\033]777;tabbedex;set_tab_name;work stuff\007"
+##     would change the name of the current tab to "work stuff".
+##
 
 use Encode qw(decode);
 
@@ -743,6 +748,24 @@ sub rename_tab {
   ();
 }
 
+
+# printf "\033]777;tabbedx;set_tab_name;new name\007"
+sub tab_osc_seq_perl {
+    my ($self, $tab, $osc) = @_;
+
+    if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
+        if ($self->{is_inputting_name}) {
+            $tab->{old_name} = $1;
+        } else {
+            $tab->{name} = $1;
+        }
+        $self->update_autohide (1);
+        $self->refresh;
+        1;
+    }
+}
+
+
 package urxvt::ext::tabbedex::tab;
 
 # helper extension implementing the subwindows of a tabbed terminal.
@@ -750,7 +773,7 @@ package urxvt::ext::tabbedex::tab;
 
 {
    for my $hook qw(start destroy user_command key_press property_notify
-                   add_lines bell) {
+                   add_lines bell osc_seq_perl) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
