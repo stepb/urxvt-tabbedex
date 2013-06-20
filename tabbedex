@@ -127,6 +127,16 @@
 ##         printf "\033]777;tabbedex;set_tab_name;work stuff\007"
 ##     would change the name of the current tab to "work stuff".
 ##
+## * Previously, if you had a lot of tabs and/or tabs with long names,
+##   the current tab might not show up in the tab bar (if its position
+##   in the tab name string was more than $self->ncol chars from the
+##   beginning).  Changes below ensure that the name of the current tab
+##   is always visible.  Arguably it would be nice to have indications
+##   at each end showing whether there are more tabs in that direction.
+##
+##   Also, when printing the tab bar, limit the length of the tab
+##   names so that one tab name doesn't occupy the whole tab bar.
+##
 
 use Encode qw(decode);
 
@@ -209,9 +219,38 @@ sub refresh {
       $ofs = 7;
    }
 
-   my $now = int urxvt::NOW;
+   my $space_available = $ofs;
+   my $max_len = int(($ncol - $ofs - 5) / ($#{ $self->{tabs} } > 1 ? 3 : 2));
+
+   # See if the name of the current tab would be displayed;
+   # if not, compute the number of tabs to skip so that the
+   # name of the current tab will be displayed.
+   my $len = $ofs;
+   my @ends;
    for my $tab (@{ $self->{tabs} }) {
-      my $name = $tab->{name} ? $tab->{name} : $idx;
+      my $name = substr($tab->{name} ? $tab->{name} : $idx, -$max_len);
+      ++$idx;
+      $len += length($name) + 3;        # '| ' and ' '
+      if ($tab == $self->{cur}) {
+         $idx = 0;
+         if ($len > $ncol + 1) {
+            for my $end (@ends) {
+               ++$idx;
+               if ($len - $end <= $ncol) {
+                  last;
+               }
+            }
+         }
+         last;
+      }
+      push @ends, $len;
+   }
+
+   my $now = int urxvt::NOW;
+
+   for (; $idx < @{ $self->{tabs} }; ++$idx) {
+      my $tab = $self->{tabs}[$idx];
+      my $name = substr($tab->{name} ? $tab->{name} : $idx, -$max_len);
       my $act = $self->tab_activity_mark($tab, $now);
       my $txt = sprintf "%s%s%s", $act, $name, matching_activity_mark $act;
       my $len = length $txt;
@@ -226,7 +265,6 @@ sub refresh {
       }
 
       push @ofs, [ $ofs, $ofs + $len, $idx ];
-      ++$idx;
       $ofs += $len + 1;
    }
 
