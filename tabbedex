@@ -2,7 +2,7 @@
 ##
 ## TabbedEx plugin for rxvt-unicode
 ## Based on original tabbed plugin.
-## Copyright (c) 2006-2009 tabbed authors
+## Copyright (c) 2006-2012 tabbed authors
 ## Copyright (c) 2009-2013 tabbedex authors
 ##
 ## This program is free software: you can redistribute it and/or modify
@@ -443,6 +443,14 @@ sub on_focus_out {
    my ($self, $event) = @_;
    $self->{cur}->focus_out;
    ();
+}
+
+sub on_tt_write {
+    my ($self, $octets) = @_;
+
+    $self->{cur}->tt_write ($octets);
+
+    1
 }
 
 sub on_key_press {
