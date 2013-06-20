@@ -113,17 +113,27 @@
 ##   Use the following in your ~/.Xdefaults to enable:
 ##   URXvt.tabbed.reopen-on-close: yes
 ##
+## Added by Jim Diamond <Jim dot Diamond at acadiau dot ca>:
+##
+## * Previous versions did not autohide the tab bar if the remaining
+##   tab had a name (as opposed to an index number).  I think "autohide"
+##   means "autohide", so I changed that behaviour.
+##
+##   [mina86@mina86.com: Added a fix to temporarily show the tab bar
+##    if renaming a tab.]
+##
 
 use Encode qw(decode);
 
 sub update_autohide {
    my ($self, $reconfigure) = @_;
    my $oldh = $self->{tabheight};
-   if ($self->{autohide} && @{ $self->{tabs} } <= 1 &&
-         ! (@{ $self->{tabs} } == 1 && $self->{tabs}[-1]->{name})) {
-      $self->{tabheight} = 0;
-   } else {
+   if (!$self->{autohide} ||
+       @{ $self->{tabs} } > 1 ||
+       $self->{is_inputting_name}) {
       $self->{tabheight} = $self->{maxtabheight};
+    } else {
+      $self->{tabheight} = 0;
    }
    if ($reconfigure && $self->{tabheight} != $oldh) {
       $self->configure;
@@ -468,7 +478,7 @@ sub on_init {
 
    $self->{new_button} = $self->rs_bool ('new-button', 0);
    $self->{tab_title} = $self->rs_bool ('title', 1);
-   $self->{autohide} = $self->rs_bool ('autohide', 0);
+   $self->{autohide} = $self->rs_bool ('autohide', 'false');
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
 
@@ -581,14 +591,14 @@ sub tab_destroy {
 sub tab_key_press {
    my ($self, $tab, $event, $keysym, $str) = @_;
 
-   if ($tab->{is_inputting_name}) {
+   if ($self->{is_inputting_name}) {
       if ($keysym == 0xff0d || $keysym == 0xff8d) { # enter
          $tab->{name} = $tab->{new_name};
-         $tab->{is_inputting_name} = 0;
+         $self->{is_inputting_name} = 0;
          $self->update_autohide (1);
       } elsif ($keysym == 0xff1b) { # escape
          $tab->{name} = $tab->{old_name};
-         $tab->{is_inputting_name} = 0;
+         $self->{is_inputting_name} = 0;
          $self->update_autohide (1);
       } elsif ($keysym == 0xff08) { # backspace
          substr $tab->{new_name}, -1, 1, "";
@@ -723,7 +733,7 @@ sub move_tab {
 sub rename_tab {
   my ($self, $tab) = @_;
 
-  $tab->{is_inputting_name} = 1;
+  $self->{is_inputting_name} = 1;
   $tab->{old_name} = $tab->{name} ? $tab->{name} : "";
   $tab->{new_name} = "";
   $tab->{name} = "█";
