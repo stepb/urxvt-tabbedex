@@ -334,16 +334,22 @@ sub copy_properties {
 }
 
 
-sub my_resource {
-   my $self = shift;
-   $self->x_resource ("tabbed.$_[0]");
+sub rs_text {
+    my ($self, $name, $default) = @_;
+    $self->x_resource ("tabbed.$name") // $default;
+}
+
+sub rs_bool {
+    my ($self, $name, $default) = @_;
+    my $val = $self->x_resource ("tabbed.$name");
+    defined $val ? $val !~ /^(?:false|0|no)$/i : $default;
 }
 
 sub rs_color($$$$) {
-   my ($self, $prefix, $def_fg, $def_bg) = @_;
-   my $fg = $self->my_resource ($prefix . '-fg') // $def_fg;
-   my $bg = $self->my_resource ($prefix . '-bg') // $def_bg;
-   urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $fg + 2, $bg + 2);
+    my ($self, $prefix, $def_fg, $def_bg) = @_;
+    my $fg = $self->rs_text ($prefix . '-fg') // $def_fg;
+    my $bg = $self->rs_text ($prefix . '-bg') // $def_bg;
+    urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $fg + 2, $bg + 2);
 }
 
 
@@ -445,7 +451,7 @@ sub on_init {
       $self->rs_color ('bell-tab', 5, 4)  # active, bell ringing
    ];
 
-   my $timeouts = $self->my_resource ("tabbar-timeouts");
+   my $timeouts = $self->rs_text ("tabbar-timeouts");
    $timeouts = '16:.:8:::4:+' unless defined $timeouts;
    if ($timeouts ne '') {
       my @timeouts;
@@ -458,18 +464,13 @@ sub on_init {
       }
    }
 
-   $self->{bell_timeout} = int($self->my_resource ('bell-timeout') // 1);
+   $self->{bell_timeout} = int($self->rs_text ('bell-timeout') // 1);
 
-   $self->{new_button} =
-      ($self->my_resource ('new-button') or 'false') !~ /^(?:false|0|no)/i;
-   $self->{tab_title} =
-      ($self->my_resource ('title') or 'true') !~ /^(?:false|0|no)/i;
-   $self->{autohide} =
-      ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
-   $self->{no_default_keys} =
-      ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
-   $self->{reopen_on_close} =
-      ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{new_button} = $self->rs_bool ('new-button', 0);
+   $self->{tab_title} = $self->rs_bool ('title', 1);
+   $self->{autohide} = $self->rs_bool ('autohide', 0);
+   $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
+   $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
 
    ();
 }
