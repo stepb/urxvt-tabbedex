@@ -318,6 +318,8 @@ sub new_tab {
 
       $term->resource (perl_ext_2 =>
                        $term->resource ("perl_ext_2") . ",-tabbedex");
+
+      $self->register_keysyms($term);
    };
 
    push @urxvt::TERM_EXT, urxvt::ext::tabbedex::tab::;
@@ -467,7 +469,7 @@ sub on_key_release {
 sub on_button_release {
    my ($self, $event) = @_;
 
-   if ($event->{row} == 0) {
+   if (!$self->{is_inputting_name} && $event->{row} == 0) {
       my $col = $event->{col};
       for my $button (@{ $self->{tabofs} }) {
          last if     $col <  $button->[0];
@@ -482,6 +484,19 @@ sub on_button_release {
    }
 
    ();
+}
+
+sub register_keysyms {
+    my ($self, $tab) = @_;
+    if (!$self->{no_default_keys}) {
+        $tab //= $self;
+        $tab->parse_keysym('Shift-Left', 'perl:tabbedex:prev_tab');
+        $tab->parse_keysym('Shift-Right', 'perl:tabbedex:next_tab');
+        $tab->parse_keysym('Shift-Down', 'perl:tabbedex:new_tab');
+        $tab->parse_keysym('Shift-Up', 'perl:tabbedex:rename_tab');
+        $tab->parse_keysym('Control-Left', 'perl:tabbedex:move_tab_left');
+        $tab->parse_keysym('Control-Right', 'perl:tabbedex:move_tab_right');
+    }
 }
 
 sub on_init {
@@ -530,6 +545,8 @@ sub on_init {
    $self->{autohide} = $self->rs_bool ('autohide', 'false');
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
+
+   $self->register_keysyms;
 
    ();
 }
@@ -634,57 +651,6 @@ sub tab_destroy {
 }
 
 
-sub tab_key_press {
-   my ($self, $tab, $event, $keysym, $str) = @_;
-
-   if ($self->{is_inputting_name}) {
-      if ($keysym == 0xff0d || $keysym == 0xff8d) { # enter
-         $tab->{name} = $tab->{new_name};
-         $self->{is_inputting_name} = 0;
-         $self->update_autohide (1);
-      } elsif ($keysym == 0xff1b) { # escape
-         $tab->{name} = $tab->{old_name};
-         $self->{is_inputting_name} = 0;
-         $self->update_autohide (1);
-      } elsif ($keysym == 0xff08) { # backspace
-         substr $tab->{new_name}, -1, 1, "";
-         $tab->{name} = "$tab->{new_name}█";
-      } elsif ($str !~ /[\x00-\x1f\x80-\xaf]/) {
-         $tab->{new_name} .= $str;
-         $tab->{name} = "$tab->{new_name}█";
-      }
-      $self->refresh;
-      return 1;
-   }
-
-   return () if ($self->{no_default_keys});
-
-   if ($event->{state} & urxvt::ShiftMask) {
-      if ($keysym == 0xff51 || $keysym == 0xff53) {
-         if (@{ $self->{tabs} } > 1) {
-            $self->change_tab($tab, $keysym - 0xff52);
-         }
-         return 1;
-
-      } elsif ($keysym == 0xff54) {
-         $self->new_tab;
-         return 1;
-
-      } elsif ($keysym == 0xff52) {
-         $self->rename_tab($tab);
-         return 1;
-      }
-   } elsif ($event->{state} & urxvt::ControlMask) {
-      if ($keysym == 0xff51 || $keysym == 0xff53) {
-         $self->move_tab($tab, $keysym - 0xff52);
-         return 1;
-      }
-   }
-
-   ();
-}
-
-
 sub tab_property_notify {
    my ($self, $tab, $event) = @_;
 
@@ -719,7 +685,9 @@ sub tab_user_command {
   my ($self, $tab, $cmd, $proxy_events) = @_;
 
   if ($cmd eq 'tabbedex:new_tab') {
-    $self->new_tab;
+    if (!$self->{is_inputting_name}) {
+      $self->new_tab;
+    }
   }
   elsif ($cmd eq 'tabbedex:next_tab') {
     $self->change_tab($tab, 1);
@@ -750,14 +718,16 @@ sub tab_user_command {
 }
 
 sub change_tab {
-  my ($self, $tab, $direction) = @_;
+    my ($self, $tab, $direction) = @_;
 
-  my $idx = 0;
-  ++$idx while $self->{tabs}[$idx] != $tab;
-  $idx += $direction;
-  $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
+    if (!$self->{is_inputting_name} && @{ $self->{tabs} } > 1) {
+        my $idx = 0;
+        ++$idx while $self->{tabs}[$idx] != $tab;
+        $idx += $direction;
+        $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
+    }
 
-  ();
+    ();
 }
 
 sub move_tab {
@@ -769,7 +739,7 @@ sub move_tab {
     my $idx2 = ($idx1 + $direction) % @{ $self->{tabs} };
 
     ($self->{tabs}[$idx1], $self->{tabs}[$idx2]) =
-      ($self->{tabs}[$idx2], $self->{tabs}[$idx1]);
+        ($self->{tabs}[$idx2], $self->{tabs}[$idx1]);
     $self->make_current ($self->{tabs}[$idx2]);
   }
 
@@ -777,16 +747,39 @@ sub move_tab {
 }
 
 sub rename_tab {
-  my ($self, $tab) = @_;
+    my ($self, $tab) = @_;
 
-  $self->{is_inputting_name} = 1;
-  $tab->{old_name} = $tab->{name} ? $tab->{name} : "";
-  $tab->{new_name} = "";
-  $tab->{name} = "█";
-  $self->update_autohide (1);
-  $self->refresh;
+    if (!$self->{is_inputting_name}) {
+        $self->{is_inputting_name} = 1;
+        $tab->{old_name} = $tab->{name} ? $tab->{name} : "";
+        $tab->{new_name} = "";
+        $tab->{name} = "█";
+        $self->update_autohide (1);
+        $self->refresh;
 
-  ();
+        $tab->enable('key_press', sub {
+            my ($tab, $event, $keysym, $str) = @_;
+
+            if ($keysym == 0xff0d || $keysym == 0xff8d) { # enter
+                $tab->{name} = $tab->{new_name};
+                $self->{is_inputting_name} = 0;
+                $tab->disable('key_press');
+                $self->update_autohide (1);
+            } elsif ($keysym == 0xff1b) { # escape
+                $tab->{name} = $tab->{old_name};
+                $self->{is_inputting_name} = 0;
+                $self->update_autohide (1);
+            } elsif ($keysym == 0xff08) { # backspace
+                substr $tab->{new_name}, -1, 1, "";
+                $tab->{name} = "$tab->{new_name}█";
+            } elsif ($str !~ /[\x00-\x1f\x80-\xaf]/) {
+                $tab->{new_name} .= $str;
+                $tab->{name} = "$tab->{new_name}█";
+            }
+            $self->refresh;
+            return 1;
+        });
+    }
 }
 
 
@@ -813,7 +806,7 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy user_command key_press property_notify
+   for my $hook qw(start destroy user_command property_notify
                    add_lines bell osc_seq_perl) {
       eval qq{
          sub on_$hook {
