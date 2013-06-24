@@ -581,11 +581,8 @@ sub on_configure_notify {
 
 
 sub on_user_command {
-  my ($self, $event) = @_;
-
-  $self->{cur}->{term}->{parent}->tab_user_command($self->{cur}, $event, 1);
-
-  ();
+    my $self = shift;
+    $self->tab_user_command($self->{cur}, @_);
 }
 
 
