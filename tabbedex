@@ -137,6 +137,9 @@
 ##   Also, when printing the tab bar, limit the length of the tab
 ##   names so that one tab name doesn't occupy the whole tab bar.
 ##
+## * Preserve -e option when creating new tabs (not only the first
+##   one).
+##
 
 use Encode qw(decode);
 
@@ -292,7 +295,7 @@ sub refresh {
 
 
 sub new_tab {
-   my ($self, @argv) = @_;
+   my ($self) = @_;
 
    unless ($self->{autohide} &&
            !(defined $self->{tabs} && @{ $self->{tabs} })) {
@@ -564,16 +567,16 @@ sub on_start {
    $self->cmd_parse ("\033[?25l");
 
    my @argv = $self->argv;
-
    do {
       shift @argv;
    } while @argv && $argv[0] ne "-e";
+   $self->{argv} = \@argv;
 
    if ($self->{tab_title}) {
       $self->{tab_title} = $self->{term}->XInternAtom("_NET_WM_NAME", 1);
    }
 
-   $self->new_tab (@argv);
+   $self->new_tab;
 
    if (defined $self->{timeouts}) {
       my $interval = ($self->{timeouts}[@{ $self->{timeouts} } - 1]->[0]);
