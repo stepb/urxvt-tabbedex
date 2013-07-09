@@ -330,7 +330,7 @@ sub new_tab {
    my $term = new urxvt::term
       $self->env, $urxvt::RXVTNAME,
       -embed => $self->parent,
-      @argv;
+      @{ $self->{argv} };
 }
 
 
