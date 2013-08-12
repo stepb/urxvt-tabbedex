@@ -94,6 +94,9 @@
 ##     Use the following in your ~/.Xdefaults to enable:
 ##     URXvt.tabbed.reopen-on-close: yes
 ##
+## 17. Destroy a tab with C-Down
+##
+## Keysym reference http://www.tcl.tk/man/tcl8.4/TkCmd/keysyms.htm
 
 use Encode qw(decode);
 
@@ -558,6 +561,11 @@ sub tab_key_press {
    } elsif ($event->{state} & urxvt::ControlMask) {
       if ($keysym == 0xff51 || $keysym == 0xff53) {
          $self->move_tab($tab, $keysym - 0xff52);
+         return 1;
+      }
+      elsif ($keysym == 0xff54) {
+         print "destroy\n";
+         $tab->destroy;
          return 1;
       }
    }
