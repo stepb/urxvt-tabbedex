@@ -94,6 +94,9 @@
 ##     Use the following in your ~/.Xdefaults to enable:
 ##     URXvt.tabbed.reopen-on-close: yes
 ##
+## 17. Destroy a tab with C-Down
+##
+## Keysym reference http://www.tcl.tk/man/tcl8.4/TkCmd/keysyms.htm
 
 use Encode qw(decode);
 
@@ -560,6 +563,10 @@ sub tab_key_press {
          $self->move_tab($tab, $keysym - 0xff52);
          return 1;
       }
+      elsif ($keysym == 0xff54) {
+         $tab->destroy;
+         return 1;
+      }
    }
 
    ();
@@ -665,7 +672,7 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy user_command key_press property_notify add_lines) {
+   for my $hook ( qw(start destroy user_command key_press property_notify add_lines) ) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
