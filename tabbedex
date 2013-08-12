@@ -564,7 +564,6 @@ sub tab_key_press {
          return 1;
       }
       elsif ($keysym == 0xff54) {
-         print "destroy\n";
          $tab->destroy;
          return 1;
       }
