@@ -113,6 +113,15 @@
 ##   Use the following in your ~/.Xdefaults to enable:
 ##   URXvt.tabbed.reopen-on-close: yes
 ##
+## * Ability to change resource name prefix used by tabbedex.  For
+##   example, adding the following resource:
+##     URXvt.tabbed.tabbedex-rs-prefix: tabbedex
+##   will cause tabbedex to read "URXvt.tabbedex.*" resources.
+##
+##   [mina86@mina86.com: In original form, the change was hard-coded,
+##    I've changed it so that it can be configured and thus not break
+##    backwards compatibility with older tabbedex versions.]
+##
 ## Added by Jim Diamond <Jim dot Diamond at acadiau dot ca>:
 ##
 ## * Previous versions did not autohide the tab bar if the remaining
@@ -392,12 +401,12 @@ sub copy_properties {
 
 sub rs_text {
     my ($self, $name, $default) = @_;
-    $self->x_resource ("tabbed.$name") // $default;
+    $self->x_resource ($self->{rs_prefix} . '.' . $name) // $default;
 }
 
 sub rs_bool {
     my ($self, $name, $default) = @_;
-    my $val = $self->x_resource ("tabbed.$name");
+    my $val = $self->x_resource ($self->{rs_prefix} . '.' . $name);
     defined $val ? $val !~ /^(?:false|0|no)$/i : $default;
 }
 
@@ -510,6 +519,9 @@ sub on_init {
 
    $self->resource (int_bwidth => 0);
    $self->resource (pty_fd => -1);
+
+   $self->{rs_prefix} = 'tabbed';
+   $self->{rs_prefix} = $self->rs_text ('tabbedex-rs-prefix', 'tabbed');
 
    $self->{option} = {};
    for my $key (keys %urxvt::OPTION) {
