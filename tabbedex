@@ -388,6 +388,7 @@ sub on_init {
 
    my $timeouts = $self->my_resource ("tabbar-timeouts");
    $timeouts = '16:.:8:::4:+' unless defined $timeouts;
+   $timeouts = decode("utf8", $timeouts);
    if ($timeouts ne '') {
       my @timeouts;
       while ($timeouts =~ /^(\d+):(.)(?::(.*))?$/) {
