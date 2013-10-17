@@ -537,7 +537,7 @@ sub on_init {
    # this is for the tabs terminal; order is important
    $self->option ($urxvt::OPTION{scrollBar}, 0);
 
-   $self->{rs_tabbar} = $self->rs_color ('tabber', 3, 0);
+   $self->{rs_tabbar} = $self->rs_color ('tabbar', 3, 0);
    $self->{rs_title}  = $self->rs_color ('title', 2, 0);
    $self->{rs_tab}    = [
       undef,                              # inactive
