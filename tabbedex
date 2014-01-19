@@ -245,7 +245,7 @@ sub refresh {
    my $len = $ofs;
    my @ends;
    for my $tab (@{ $self->{tabs} }) {
-      my $name = substr($tab->{name} ? $tab->{name} : $idx, -$max_len);
+      my $name = substr($tab->{name} ? $tab->{name} : $idx + 1, -$max_len);
       ++$idx;
       $len += length($name) + 3;        # '| ' and ' '
       if ($tab == $self->{cur}) {
@@ -267,7 +267,7 @@ sub refresh {
 
    for (; $idx < @{ $self->{tabs} }; ++$idx) {
       my $tab = $self->{tabs}[$idx];
-      my $name = substr($tab->{name} ? $tab->{name} : $idx, -$max_len);
+      my $name = substr($tab->{name} ? $tab->{name} : $idx + 1, -$max_len);
       my $act = $self->tab_activity_mark($tab, $now);
       my $txt = sprintf "%s%s%s", $act, $name, matching_activity_mark $act;
       my $len = length $txt;
