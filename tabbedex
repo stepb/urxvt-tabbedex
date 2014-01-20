@@ -425,29 +425,32 @@ sub rs_color($$$$) {
 
 
 sub make_current {
-   my ($self, $tab) = @_;
+    my ($self, $tab) = @_;
 
-   if (my $cur = $self->{cur}) {
-      delete $cur->{last_activity};
-      delete $cur->{bell_rung};
-      $cur->XUnmapWindow ($cur->parent) if $cur->mapped;
-      $cur->focus_out;
-   }
+    my $cur = $self->{cur};
+    if ($cur != $tab) {
+        if ($cur) {
+            delete $cur->{last_activity};
+            delete $cur->{bell_rung};
+            $cur->XUnmapWindow ($cur->parent) if $cur->mapped;
+            $cur->focus_out;
+        }
 
-   $self->{cur} = $tab;
+        $self->{cur} = $tab;
 
-   $self->configure;
-   $self->copy_properties;
+        $self->configure;
+        $self->copy_properties;
 
-   $tab->focus_out; # just in case, should be a nop
-   $tab->focus_in if $self->focus;
+        $tab->focus_out; # just in case, should be a nop
+        $tab->focus_in if $self->focus;
 
-   $tab->XMapWindow ($tab->parent);
-   delete $tab->{last_activity};
-   delete $tab->{bell_rung};
-   $self->refresh;
+        $tab->XMapWindow ($tab->parent);
+        delete $tab->{last_activity};
+        delete $tab->{bell_rung};
+        $self->refresh;
+    }
 
-   ();
+    ();
 }
 
 
