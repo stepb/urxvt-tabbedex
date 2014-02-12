@@ -126,6 +126,10 @@ sub tab_activity_mark ($$) {
    '*';
 }
 
+sub tab_is_root {
+   my ($self, $tab) = @_;
+   $tab->{term}->XGetWindowProperty($tab->{term}->parent, $self->{tab_title}) =~ /^root@/i;
+}
 
 sub refresh {
    my ($self) = @_;
@@ -154,8 +158,13 @@ sub refresh {
       my $len = length $txt;
 
       substr $text, $ofs, $len + 1, "$txt|";
-      @$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
-         if $tab == $self->{cur};
+
+      if ($self->tab_is_root($tab)) {
+         @$rend[$ofs .. $ofs + $len - 1] = ($tab != $self->{cur} ? $self->{rs_root} : $self->{rs_roots}) x $len;
+      } else {
+         @$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
+            if ($tab == $self->{cur});
+      }
 
       push @ofs, [ $ofs, $ofs + $len, $idx ];
       ++$idx;
@@ -384,6 +393,8 @@ sub on_init {
    $self->{rs_tabbar} = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $fg    + 2, $bg    + 2);
    $self->{rs_tab}    = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $tabfg + 2, $tabbg + 2);
    $self->{rs_title}  = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $titfg + 2, $titbg + 2);
+   $self->{rs_root}   = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $tabfg + 2, 3);
+   $self->{rs_roots}  = urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $tabbg + 2, 3);
 
 
    my $timeouts = $self->my_resource ("tabbar-timeouts");
