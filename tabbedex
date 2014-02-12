@@ -58,10 +58,6 @@
 ##   decorations.  Colours can be configured via title-fg and
 ##   title-bg.
 ##
-## * Tabs are indexed in starting with zero hex. :] If you're such
-##   a geek to use urxvt it shouldn't be a problem for you and it
-##   saves few character when many tabs are opened.
-##
 ## * As a minor modification: Final pipe character is removed (unless
 ##   title is displayed).  This make tab bar look nicer.
 ##
