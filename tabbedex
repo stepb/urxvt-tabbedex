@@ -443,8 +443,8 @@ sub make_current {
         $tab->XMapWindow ($tab->parent);
         delete $tab->{last_activity};
         delete $tab->{bell_rung};
-        $self->refresh;
     }
+    $self->refresh;
 
     ();
 }
