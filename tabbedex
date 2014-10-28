@@ -150,6 +150,11 @@
 ## * Preserve -e option when creating new tabs (not only the first
 ##   one).
 ##
+## Added by 8ware:
+##
+## * Handling of special cases when moving a tab around, so first or
+##   last tab won't be swapped.
+##
 
 use Encode qw(decode);
 
@@ -775,13 +780,22 @@ sub move_tab {
   my ($self, $tab, $direction) = @_;
 
   if (@{ $self->{tabs} } > 1) {
-    my $idx1 = 0;
-    ++$idx1 while $self->{tabs}[$idx1] != $tab;
-    my $idx2 = ($idx1 + $direction) % @{ $self->{tabs} };
+    my $last = $#{$self->{tabs}};
+    my $idx = 0;
+    ++$idx while $self->{tabs}[$idx] != $tab;
 
-    ($self->{tabs}[$idx1], $self->{tabs}[$idx2]) =
-        ($self->{tabs}[$idx2], $self->{tabs}[$idx1]);
-    $self->make_current ($self->{tabs}[$idx2]);
+    if ($idx == 0 && $direction == -1) {
+      push @{$self->{tabs}}, shift @{$self->{tabs}};
+      $idx = $last;
+    } elsif ($idx == $last && $direction == 1) {
+      unshift @{$self->{tabs}}, pop @{$self->{tabs}};
+      $idx = 0;
+    } else {
+      ($self->{tabs}[$idx], $self->{tabs}[$idx + $direction]) =
+        ($self->{tabs}[$idx + $direction], $self->{tabs}[$idx]);
+      $idx += $direction;
+    }
+    $self->make_current ($self->{tabs}[$idx]);
   }
 
   ();
