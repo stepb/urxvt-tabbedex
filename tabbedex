@@ -52,7 +52,7 @@
 ##    title is displayed).  This make tab bar look nicer.
 ##
 ## Added by StephenB:
-## 
+##
 ## 7. Tabs can be named with Shift+Up (Enter to confirm, Escape to
 ##    cancel).
 ##
@@ -480,8 +480,8 @@ sub tab_start {
    $tab->XChangeInput ($tab->parent, urxvt::PropertyChangeMask);
 
    push @{ $self->{tabs} }, $tab;
-
-#   $tab->{name} ||= scalar @{ $self->{tabs} };
+   # Tab names start with 1
+   $tab->{name} ||= scalar @{ $self->{tabs} };
    $self->make_current ($tab);
 
    ();
@@ -606,6 +606,9 @@ sub tab_user_command {
   elsif ($cmd eq 'tabbedex:rename_tab') {
     $self->rename_tab($tab);
   }
+  elsif ($cmd =~ /^tabbedex:goto_tab_(\d)$/) {
+    $self->goto_tab(int($1)-1);
+  }
   else {
     # Proxy the user command through to the tab's term, while taking care not
     # to get caught in an infinite loop.
@@ -615,7 +618,15 @@ sub tab_user_command {
       $self->{running_user_command} = 0;
     }
   }
+  ();
+}
 
+sub goto_tab {
+  my ($self, $idx) = @_;
+
+  if ($idx >= 0 and $idx <= @{ $self->{tabs}}) {
+    $self->make_current ($self->{tabs}[$idx]);
+  }
   ();
 }
 
@@ -665,7 +676,7 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy user_command key_press property_notify add_lines) {
+   for my $hook (qw(start destroy user_command key_press property_notify add_lines)) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
