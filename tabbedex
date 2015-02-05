@@ -560,6 +560,14 @@ sub tab_key_press {
          $self->move_tab($tab, $keysym - 0xff52);
          return 1;
       }
+   } elsif ($event->{state} & $self->ModMetaMask) {
+      if ($keysym >= 0x30 && $keysym <= 0x39) {
+          my $idx = $keysym - 0x30;
+          if ($idx < @{ $self->{tabs}}) {
+              $self->select_tab ($idx);
+              return 1;
+          }
+      }
    }
 
    ();
@@ -619,13 +627,23 @@ sub tab_user_command {
   ();
 }
 
+sub select_tab {
+  my ($self, $idx) = @_;
+
+  if ($idx < @{ $self->{tabs}}) {
+      $self->make_current ($self->{tabs}[$idx]);
+  }
+
+  ();
+}
+
 sub change_tab {
   my ($self, $tab, $direction) = @_;
 
   my $idx = 0;
   ++$idx while $self->{tabs}[$idx] != $tab;
   $idx += $direction;
-  $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
+  $self->select_tab ($idx);
 
   ();
 }
@@ -665,7 +683,7 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 {
-   for my $hook qw(start destroy user_command key_press property_notify add_lines) {
+   for my $hook (qw(start destroy user_command key_press property_notify add_lines)) {
       eval qq{
          sub on_$hook {
             my \$parent = \$_[0]{term}{parent}
