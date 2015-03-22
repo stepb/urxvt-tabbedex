@@ -22,7 +22,7 @@
 ## The following has been added:
 ##
 ## 1. Depending on time of last activity, activity character differs.
-##    By default, after 4 seconds an asterisk becomes a plus sing,
+##    By default, after 4 seconds an asterisk becomes a plus sign,
 ##    after next 4 it becomes a colon, and finally, after another 8
 ##    seconds it becomes a dot.  This can be configured via
 ##    tabbar-timeouts resource.  It's format is:
