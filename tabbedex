@@ -94,6 +94,14 @@
 ##     Use the following in your ~/.Xdefaults to enable:
 ##     URXvt.tabbed.reopen-on-close: yes
 ##
+## Added By Chas. J. Owens IV <chas.owens@gmail.com>
+##
+## 17. Title is now truncated if part of it goes off the screen.
+##     The last character of the truncated title is an ellipses.
+##
+## 18. Titles can now be right justified. Use the following in your
+##     ~/.XdefaultsAdded to enable:
+##     URXvt.tabbed.right-justify-title: yes
 
 use Encode qw(decode);
 
@@ -126,7 +134,14 @@ sub tab_activity_mark ($$) {
    '*';
 }
 
-
+# FIXME: all of this is making bad assumptions that length = cols we need to
+# use Unicode::GCString to find out the number of columns a string will fit in.
+# For example, "e\x{301}" (e with combining acute) has a length of 2, but
+# Unicode::GCString->new("e\x{301})->columns returns 1.  Another option is
+# to use my $length =()= "e\x{301}" =~ /\X/g; It has the benefit of being
+# in Core Perl since at least Perl 5.8.9.  Probably need to perform a test like
+# if ($] ge "5.008") { use length } else { use regex } to keep this backwards
+# compatible
 sub refresh {
    my ($self) = @_;
 
@@ -197,14 +212,21 @@ sub refresh {
                # ellipsis to indicate the truncation
                $title = substr $title, 0, $remaining - 1;
                $title .= "\x{2026}";
+               $title_len = length $title;
             }
          }
+         $text .= "| ";
 
-         # FIXME: add option to right justify title
-         $text .= "| " . $title;
+         my $padding_len = 0;
+         my $padding     = "";
+         if ($self->{right_justify_title}) {
+            $padding_len = ($ncol - length $text) - $title_len;
+            $padding = " " x $padding_len;
+         }
+         $text .= "$padding$title";
          push @rend,
-            ($self->{rs_tabbar}) x 2,
-            ($self->{rs_title})  x (length $title);
+            ($self->{rs_tabbar}) x (2 + $padding_len),
+            ($self->{rs_title})  x length $title;
       }
    }
 
@@ -444,8 +466,10 @@ sub on_init {
       ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
    $self->{no_default_keys} =
       ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
-    $self->{reopen_on_close} =
+   $self->{reopen_on_close} =
       ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{right_justify_title} =
+      ($self->my_resource ('right-justify-title') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
