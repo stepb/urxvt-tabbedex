@@ -94,6 +94,14 @@
 ##     Use the following in your ~/.Xdefaults to enable:
 ##     URXvt.tabbed.reopen-on-close: yes
 ##
+## Added By Chas. J. Owens IV <chas.owens@gmail.com>
+##
+## 17. Title is now truncated if part of it goes off the screen.
+##     The last character of the truncated title is an ellipses.
+##
+## 18. Titles can now be right justified. Use the following in your
+##     ~/.XdefaultsAdded to enable:
+##     URXvt.tabbed.right-justify-title: yes
 
 use Encode qw(decode);
 
@@ -126,7 +134,14 @@ sub tab_activity_mark ($$) {
    '*';
 }
 
-
+# FIXME: all of this is making bad assumptions that length = cols we need to
+# use Unicode::GCString to find out the number of columns a string will fit in.
+# For example, "e\x{301}" (e with combining acute) has a length of 2, but
+# Unicode::GCString->new("e\x{301})->columns returns 1.  Another option is
+# to use my $length =()= "e\x{301}" =~ /\X/g; It has the benefit of being
+# in Core Perl since at least Perl 5.8.9.  Probably need to perform a test like
+# if ($] ge "5.008") { use length } else { use regex } to keep this backwards
+# compatible
 sub refresh {
    my ($self) = @_;
 
@@ -135,51 +150,95 @@ sub refresh {
 
    my $ncol = $self->ncol;
 
-   my $text = " " x $ncol;
-   my $rend = [($self->{rs_tabbar}) x $ncol];
-
-   my ($ofs, $idx, @ofs) = (0, 0);
+   # $text holds the actual text that will be rendered to the screen
+   my $text = "";
+   # $rend holds the colors that will be rendered to the screen
+   my @rend;
+   # index of the current tab
+   my $tab_index = 0;
+   # offsets for the clickable areas [start, end, type]
+   my @ofs;
 
    if ($self->{new_button}) {
-      substr $text, 0, 7, "[NEW] |";
-      @$rend[0 .. 5] = ($self->{rs_tab}) x 6;
-      push @ofs, [0, 6, -1 ];
-      $ofs = 7;
+      $text .= "[NEW] |";
+      push @rend, ($self->{rs_tab}) x 6;
+      push @ofs, [0, 6, -1]; # make the first six characters the new tab button
    }
 
+   my $ofs = length $text;
    for my $tab (@{ $self->{tabs} }) {
-      my $name = $tab->{name} ? $tab->{name} : $idx;
-      my $act = $self->tab_activity_mark($tab);
-      my $txt = sprintf "%s%s%s", $act, $name, $act;
-      my $len = length $txt;
+      my $name    = $tab->{name} ? $tab->{name} : $tab_index;
+      my $act     = $self->tab_activity_mark($tab);
+      $text      .= "$act$name$act|";
+      my $tab_len = 2 + length $name;
 
-      substr $text, $ofs, $len + 1, "$txt|";
-      @$rend[$ofs .. $ofs + $len - 1] = ($self->{rs_tab}) x $len
-         if $tab == $self->{cur};
+      if ($tab == $self->{cur}) {
+         push @rend, ($self->{rs_tab}) x $tab_len, $self->{rs_tabbar};
+      } else {
+         push @rend, ($self->{rs_tabbar}) x (1 + $tab_len);
+      }
 
-      push @ofs, [ $ofs, $ofs + $len, $idx ];
-      ++$idx;
-      $ofs += $len + 1;
+      # make the title and the activity marks clickable
+      push @ofs, [ $ofs, $ofs + $tab_len, $tab_index ];
+      $ofs += $tab_len + 1; # the +1 takes into account the |
+
+      # no point in continuing to write tabs if they are off screen
+      # FIXME: make tab double height when this happens (or triple, etc.)
+      # probably need to make $text an array, @rend a multidimensional array
+      # make multiple calls to ROW_[t|r], and do something interesting to
+      # $self->{tabofs}
+      last if $ncol <= length $text;
+
+      ++$tab_index;
    }
 
-   substr $text, --$ofs, 1, ' '; # remove last '|'
+   # remove last |
+   $text =~ s/\|$//;
+   pop @rend;
 
-   if ($self->{tab_title} && $ofs + 3 < $ncol) {
+   if ($self->{tab_title}) {
       my $term = $self->{term};
-      my @str = $term->XGetWindowProperty($term->parent, $self->{tab_title});
+      my @str  = $term->XGetWindowProperty($term->parent, $self->{tab_title});
       if (@str && $str[2]) {
-         my $str = '| ' . decode("utf8", $str[2]);
-         my $len = length $str;
-         $len = $ncol - $ofs if $ofs + $len > $ncol;
-         substr $text, $ofs, $len, substr $str, 0, $len;
-         @$rend[$ofs + 2 .. $ofs + $len - 1] = ($self->{rs_title}) x ($len - 2);
+         my $title      = decode("utf8", $str[2]);
+         my $title_len  = length $title;
+         my $tabbar_len = 2 + length $text; # the 2 takes into account the "| "
+
+         #trim title to fit length
+         if ($title_len + $tabbar_len > $ncol) {
+            my $remaining = $ncol - $tabbar_len;
+            if ($remaining > 0) {
+               # if we can't fit the title, truncate it and add an
+               # ellipsis to indicate the truncation
+               $title = substr $title, 0, $remaining - 1;
+               $title .= "\x{2026}";
+               $title_len = length $title;
+            }
+         }
+         $text .= "| ";
+
+         my $padding_len = 0;
+         my $padding     = "";
+         if ($self->{right_justify_title}) {
+            $padding_len = ($ncol - length $text) - $title_len;
+            $padding = " " x $padding_len;
+         }
+         $text .= "$padding$title";
+         push @rend,
+            ($self->{rs_tabbar}) x (2 + $padding_len),
+            ($self->{rs_title})  x length $title;
       }
    }
 
+   # pad the text and color out to the end
+   my $left_over = ($ncol - length $text);
+   $text .= " " x $left_over;
+   push @rend, ($self->{rs_tabbar}) x $left_over;
+
    $self->{tabofs} = \@ofs;
 
-   $self->ROW_t (0, $text, 0, 0, $ncol);
-   $self->ROW_r (0, $rend, 0, 0, $ncol);
+   $self->ROW_t (0, $text,  0, 0, $ncol);
+   $self->ROW_r (0, \@rend, 0, 0, $ncol);
 
    $self->want_refresh;
 }
@@ -407,8 +466,10 @@ sub on_init {
       ($self->my_resource ('autohide') or 'false') !~ /^(?:false|0|no)/i;
    $self->{no_default_keys} =
       ($self->my_resource ('no-tabbedex-keys') or 'false') !~ /^(?:false|0|no)/i;
-    $self->{reopen_on_close} =
+   $self->{reopen_on_close} =
       ($self->my_resource ('reopen-on-close') or 'false') !~ /^(?:false|0|no)/i;
+   $self->{right_justify_title} =
+      ($self->my_resource ('right-justify-title') or 'false') !~ /^(?:false|0|no)/i;
 
    ();
 }
