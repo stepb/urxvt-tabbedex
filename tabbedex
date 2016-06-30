@@ -162,6 +162,12 @@
 ##
 ##       URxvt.tabbed.tab-urgent-on-bell: true
 ##
+## * The following variable allows to disable command inheritance in new tabs:
+##
+##      URxvt.tabbed.new-tab-inherits-command: false
+##
+##   In other words, with that set to false, the -e switch only affects the
+##   first created tab.
 
 use Encode qw(decode);
 
@@ -586,6 +592,8 @@ sub on_init {
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
    $self->{tab_urgent_on_bell} = $self->rs_bool ('tab-urgent-on-bell', 0);
+   $self->{new_tab_inherits_command} =
+      $self->rs_bool ('new-tab-inherits-command', 1);
 
    $self->register_keysyms;
 
@@ -618,6 +626,9 @@ sub on_start {
    }
 
    $self->new_tab;
+   if (!$self->{new_tab_inherits_command}) {
+       $self->{argv} = [];
+   }
 
    if (defined $self->{timeouts}) {
       my $interval = ($self->{timeouts}[@{ $self->{timeouts} } - 1]->[0]);
