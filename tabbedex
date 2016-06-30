@@ -155,6 +155,13 @@
 ## * Handling of special cases when moving a tab around, so first or
 ##   last tab won't be swapped.
 ##
+## Added by David Beniamine <david@beniamine.net>:
+##
+## * It is possible to make urxvt window urgent when bell rings in an inactive
+##   tab.  This feature can be activated with:
+##
+##       URxvt.tabbed.tab-urgent-on-bell: true
+##
 
 use Encode qw(decode);
 
@@ -181,6 +188,9 @@ sub tab_bell_active ($$$) {
         if ($tab == $self->{cur}) {
             return $now - $tab->{bell_rung} < $self->{bell_timeout};
         } else {
+            if ($self->{tab_urgent_on_bell}) {
+                $self->{term}->set_urgency(1);
+            }
             return 1;
         }
     }
@@ -575,6 +585,7 @@ sub on_init {
    $self->{autohide} = $self->rs_bool ('autohide', 'false');
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
+   $self->{tab_urgent_on_bell} = $self->rs_bool ('tab-urgent-on-bell', 0);
 
    $self->register_keysyms;
 
