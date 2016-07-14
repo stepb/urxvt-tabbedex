@@ -262,7 +262,7 @@ sub refresh {
    my $len = $ofs;
    my @ends;
    for my $tab (@{ $self->{tabs} }) {
-      my $name = substr($tab->{name} ? $tab->{name} : $idx + 1, -$max_len);
+      my $name = $tab->tab_name($idx, $max_len);
       ++$idx;
       $len += length($name) + 3;        # '| ' and ' '
       if ($tab == $self->{cur}) {
@@ -284,7 +284,7 @@ sub refresh {
 
    for (; $idx < @{ $self->{tabs} }; ++$idx) {
       my $tab = $self->{tabs}[$idx];
-      my $name = substr($tab->{name} ? $tab->{name} : $idx + 1, -$max_len);
+      my $name = $tab->tab_name($idx, $max_len);
       my $act = $self->tab_activity_mark($tab, $now);
       my $txt = sprintf "%s%s%s", $act, $name, matching_activity_mark $act;
       my $len = length $txt;
@@ -847,11 +847,11 @@ sub rename_tab {
                 $self->{is_inputting_name} = 0;
                 $self->update_autohide (1);
             } elsif ($keysym == 0xff08) { # backspace
-                substr $tab->{new_name}, -1, 1, "";
-                $tab->{name} = "$tab->{new_name}█";
+                substr $tab->{new_name}, -1, 1;
+                $tab->{name} = $tab->{new_name} . '█';
             } elsif ($str !~ /[\x00-\x1f\x80-\xaf]/) {
                 $tab->{new_name} .= $str;
-                $tab->{name} = "$tab->{new_name}█";
+                $tab->{name} = $tab->{new_name} . '█';
             }
             $self->refresh;
             return 1;
@@ -894,4 +894,9 @@ package urxvt::ext::tabbedex::tab;
       };
       die if $@;
    }
+}
+
+sub tab_name {
+    my ($tab, $idx, $max_len) = @_;
+    return substr($tab->{name} || ($idx + 1), -$max_len);
 }
