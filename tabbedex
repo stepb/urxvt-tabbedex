@@ -424,7 +424,8 @@ sub copy_properties {
 
 sub rs_text {
     my ($self, $name, $default) = @_;
-    $self->x_resource ($self->{rs_prefix} . '.' . $name) // $default;
+    my $value = $self->x_resource ($self->{rs_prefix} . '.' . $name);
+    defined $value ? $self->locale_decode($value) : $default;
 }
 
 sub rs_bool {
@@ -570,10 +571,8 @@ sub on_init {
       $self->rs_color ('bell-tab', 5, 4)  # active, bell ringing
    ];
 
-   my $timeouts = $self->rs_text ("tabbar-timeouts");
-   $timeouts = '16:.:8:::4:+' unless defined $timeouts;
-   $timeouts = decode("utf8", $timeouts);
-   if ($timeouts ne '') {
+   my $timeouts = $self->rs_text('tabbar-timeouts', '16:.:8:::4:+');
+   if ($timeouts) {
       my @timeouts;
       while ($timeouts =~ /^(\d+):(.)(?::(.*))?$/) {
          push @timeouts, [ int $1, $2 ];
