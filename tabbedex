@@ -571,7 +571,8 @@ sub on_init {
       $self->rs_color ('bell-tab', 5, 4)  # active, bell ringing
    ];
 
-   my $timeouts = $self->rs_text('tabbar-timeouts', '16:.:8:::4:+');
+   my $timeouts = $self->rs_text('tabbar-timeouts',
+                                 '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█');
    if ($timeouts) {
       my @timeouts;
       while ($timeouts =~ /^(\d+):(.)(?::(.*))?$/) {
