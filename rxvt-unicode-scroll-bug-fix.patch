@@ -10,8 +10,8 @@ reproduce:
    screens of text.
 3. Focus the terminal window and move mouse pointer over it.
 4. Press Shift+PgUp and observe content scroll up.
-5. Move mouse pointer outside of the terminal window while not
-   keeping focus on the window.
+5. Move mouse pointer outside of the terminal window while keeping
+   focus on the window.
 6. Press Shift+PgUp or Shift+PgDn.
 Expected: Content scrolls up or down (as in step 4).
 Observed: Nothing happens.
