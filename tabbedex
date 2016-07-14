@@ -835,7 +835,15 @@ sub rename_tab {
         $self->refresh;
 
         $tab->enable('key_press', sub {
-            my ($tab, $event, $keysym, $str) = @_;
+            # rxvt-unicode-scroll-bug-fix.patch causes early key_press events to
+            # be passed without $keysym or $octects arguments passed.  Work
+            # around it by ignoring such invocations; we’ll be called again soon
+            # with all those arguments.
+            if (@_ == 2) {
+                    return 0;
+            }
+
+            my ($tab, $event, $keysym, $octets) = @_;
 
             if ($keysym == 0xff0d || $keysym == 0xff8d) { # enter
                 $tab->{name} = $tab->{new_name};
@@ -849,8 +857,8 @@ sub rename_tab {
             } elsif ($keysym == 0xff08) { # backspace
                 substr $tab->{new_name}, -1, 1;
                 $tab->{name} = $tab->{new_name} . '█';
-            } elsif ($str !~ /[\x00-\x1f\x80-\xaf]/) {
-                $tab->{new_name} .= $str;
+            } elsif ($octets !~ /[\x00-\x1f\x80-\xaf]/) {
+                $tab->{new_name} .= $octets;
                 $tab->{name} = $tab->{new_name} . '█';
             }
             $self->refresh;
