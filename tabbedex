@@ -162,12 +162,24 @@
 ##
 ##       URxvt.tabbed.tab-urgent-on-bell: true
 ##
-## * The following variable allows to disable command inheritance in new tabs:
+## * The URxvt.tabbed.new-tab-command resource makes it possible to customise
+##   -e command inheritance in new tabs:
 ##
-##      URxvt.tabbed.new-tab-inherits-command: false
+##   - URxvt.tabbed.new-tab-command: inherit       -- the default (old)
+##     behaviour where -e command passed when invoking urxvt is passed to all
+##     new tabs.
 ##
-##   In other words, with that set to false, the -e switch only affects the
-##   first created tab.
+##   - URxvt.tabbed.new-tab-command: clear         -- only the initial tab will
+##     use -e command passed on command line.
+##
+##   - URxvt.tabbed.new-tab-command: -e foo bar    -- the initial tab will use
+##     -e switch passed on command line, while other tabs will use -e passed in
+##     the resource.  Note that parsing of the resource simply splits on white
+##     space so you cannot to do things like ‘-e my-prog "argument with spaces"’
+##
+##   [mina86@mina86.com: changed from a boolean flag to a text configuration
+##    option.]
+##
 
 use Encode qw(decode);
 
@@ -600,8 +612,7 @@ sub on_init {
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
    $self->{tab_urgent_on_bell} = $self->rs_bool ('tab-urgent-on-bell', 0);
-   $self->{new_tab_inherits_command} =
-      $self->rs_bool ('new-tab-inherits-command', 1);
+   $self->{new_tab_command} = $self->rs_text ('new-tab-command', 'inherit');
 
    $self->register_keysyms;
 
@@ -634,9 +645,18 @@ sub on_start {
    }
 
    $self->new_tab;
-   if (!$self->{new_tab_inherits_command}) {
-       $self->{argv} = [];
+
+   if ($self->{new_tab_command} eq 'inherit') {
+      # nop
+   } elsif ($self->{new_tab_command} eq 'clear') {
+      $self->{argv} = [];
+   } elsif ($self->{new_tab_command} =~ /^-e\s/) {
+      $self->{argv} = [split /\s+/, $self->{new_tab_command}];
+   } else {
+      printf "tabbedex: unrecognised value of new-tab-command: '%s'\n",
+         $self->{new_tab_command};
    }
+   delete $self->{new_tab_command};
 
    if (defined $self->{timeouts}) {
       my $interval = ($self->{timeouts}[@{ $self->{timeouts} } - 1]->[0]);
