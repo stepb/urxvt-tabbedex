@@ -494,15 +494,23 @@ sub on_tt_write {
 
 sub on_key_press {
    my ($self, $event) = @_;
-   $self->{cur}->key_press ($event->{state}, $event->{keycode}, $event->{time});
-   1;
+   $self->key_event('key_press', $event);
 }
 
 sub on_key_release {
    my ($self, $event) = @_;
-   $self->{cur}->key_release ($event->{state}, $event->{keycode},
-                              $event->{time});
-   1;
+   $self->key_event('key_release', $event);
+}
+
+sub key_event {
+	my ($self, $type, $event) = @_;
+	my $term = $self->{cur};
+	$term->$type($event->{state}, $event->{keycode}, $event->{time});
+	# refresh_check is available since rxvt-unicode 9.22.
+	if ($term->can('refresh_check')) {
+		$term->refresh_check;
+	}
+	1;
 }
 
 sub on_button_release {
@@ -838,7 +846,8 @@ sub rename_tab {
             # rxvt-unicode-scroll-bug-fix.patch causes early key_press events to
             # be passed without $keysym or $octects arguments passed.  Work
             # around it by ignoring such invocations; we’ll be called again soon
-            # with all those arguments.
+            # with all those arguments.  The patch shouldn’t be used any more
+            # anyway.
             if (@_ == 2) {
                     return 0;
             }
@@ -868,7 +877,6 @@ sub rename_tab {
 }
 
 
-# printf "\033]777;tabbedx;set_tab_name;new name\007"
 sub tab_osc_seq_perl {
     my ($self, $tab, $osc) = @_;
 
