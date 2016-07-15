@@ -1,9 +1,7 @@
 #! perl
 ##
-## TabbedEx plugin for rxvt-unicode
-## Based on original tabbed plugin.
-## Copyright (c) 2006-2012 tabbed authors
-## Copyright (c) 2009-2014 tabbedex authors
+## TabbedEx plugin for rxvt-unicode; based on original tabbed plugin.
+## Copyright (c) 2006-2016 tabbed and tabbedex authors
 ##
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
