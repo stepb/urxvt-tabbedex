@@ -204,9 +204,6 @@ sub tab_bell_active ($$$) {
         if ($tab == $self->{cur}) {
             return $now - $tab->{bell_rung} < $self->{bell_timeout};
         } else {
-            if ($self->{tab_urgent_on_bell}) {
-                $self->{term}->set_urgency(1);
-            }
             return 1;
         }
     }
@@ -748,6 +745,9 @@ sub tab_bell {
     my $bell = $self->tab_bell_active($tab, $now);
     $tab->{bell_rung} = $now;
     $self->refresh if $bell ne $self->tab_bell_active($tab, $now);
+    if ($tab != $self->{cur} && $self->{tab_urgent_on_bell}) {
+        $self->{term}->set_urgency(1);
+    }
     ();
 }
 
