@@ -606,7 +606,8 @@ sub on_init {
    $self->{autohide} = $self->rs_bool ('autohide', 1);
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
-   $self->{tab_urgent_on_bell} = $self->rs_bool ('tab-urgent-on-bell', 0);
+   $self->{tab_urgent_on_bell} =
+     $self->x_resource_boolean ('urgentOnBell') // 0;
    $self->{new_tab_command} = $self->rs_text ('new-tab-command', 'inherit');
 
    $self->register_keysyms;
