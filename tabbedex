@@ -603,7 +603,7 @@ sub on_init {
 
    $self->{new_button} = $self->rs_bool ('new-button', 0);
    $self->{tab_title} = $self->rs_bool ('title', 1);
-   $self->{autohide} = $self->rs_bool ('autohide', 'false');
+   $self->{autohide} = $self->rs_bool ('autohide', 1);
    $self->{no_default_keys} = $self->rs_bool ('no-tabbedex-keys', 0);
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
    $self->{tab_urgent_on_bell} = $self->rs_bool ('tab-urgent-on-bell', 0);
