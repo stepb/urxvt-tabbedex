@@ -78,6 +78,11 @@ To start urxvt with the extension enabled simply run C<urxvt -pe tabbedex>.  To
 make it the default, configure the B<perl-ext> or B<perl-ext-common> urxvt's
 resources.  Refer to B<RESOURCES> section of L<urxvt(1)> man page.
 
+Makefile provided with the distribution can help with installation.  B<make
+install> will install the extension system-wide while B<make install-local> will
+install it in local directory.  In the latter case, if ~/bin is in PATH, B<man
+urxvt-tabbedex> will display this man page.
+
 =head1 CONFIGURATION
 
 The extension can be configured similarly to a normal terminal.  By default, it
