@@ -1,0 +1,90 @@
+#!/bin/sh
+# tabbedex install script
+
+# Wrap everything in a function so we don’t have to worry about connection
+# dropping in the middle of the stream.  This makes ‘curl … | sh’ as well as
+# updating the install script while it is running safe.
+_() {
+
+url=https://github.com/mina86/urxvt-tabbedex
+git="$(which git 2>/dev/null)"
+
+set -eu
+
+mkdir -p ~/.urxvt
+cd ~/.urxvt
+
+if [ -e urxvt-tabbedex ]; then
+	echo '~/.urxvt/urxvt-tabbedex already exist, overwrite? [y/N]'
+	read ans
+	case $ans in
+	y|yes|Y|YES)
+	;;
+	*)
+		exit 1;
+	esac
+fi
+
+if [ -z "$git" ]; then
+	if [ -e urxvt-tabbedex ]; then
+		rm -rf -- urxvt-tabbedex
+	fi
+	(
+		set -x
+		curl "$url/archive/master.zip"
+		unzip master.zip
+		rm master.zip
+		exec mv urxvt-tabbedex-master urxvt-tabbedex
+	)
+		cd urxvt-tabbedex
+elif [ -e urxvt-tabbedex/.git ]; then
+	cd urxvt-tabbedex
+	(
+		set -x
+		git remote update
+		exec git reset --hard origin/master
+	)
+else
+	if [ -e urxvt-tabbedex ]; then
+		(set -x; exec rm -rf -- urxvt-tabbedex)
+	fi
+	(set -x; exec git clone "$url")
+	cd urxvt-tabbedex
+fi
+
+case "$(id -u):$git" in
+0:*)
+	echo 'Running as super user, installing globally.'
+	make install
+	echo
+	echo 'You can re-run this script to update the extension.'
+	;;
+
+*:?*)
+	echo 'Running as regular user, installing locally'
+	make install-local
+	echo
+	echo 'You can re-run this script to update the extension.'
+	;;
+
+*:?*)
+	echo 'Running as regular user, installing symbolic links locally'
+	make install-local-symlink
+	make install-local-symlink
+	cat <<EOF
+
+You can run
+
+    cd ~/.urxvt/urxvt-tabbedex &&
+    git pull &&
+    git reset --hard origin/master &&
+    make
+
+to update the extension.
+EOF
+esac
+
+exit
+}
+
+_
