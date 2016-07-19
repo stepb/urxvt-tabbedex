@@ -1,183 +1,294 @@
 #! perl
-##
-## TabbedEx plugin for rxvt-unicode; based on original tabbed plugin.
-## Copyright (c) 2006-2016 tabbed and tabbedex authors
-##
-## This program is free software: you can redistribute it and/or modify
-## it under the terms of the GNU General Public License as published by
-## the Free Software Foundation, either version 3 of the License, or
-## (at your option) any later version.
-##
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-##
-## You should have received a copy of the GNU General Public License
-## along with this program.  If not, see <http://www.gnu.org/licenses/>.
-##
-##
-## Modified by Michal Nazarewicz (mina86@mina86.com), StephenB
-## (mail4stb/AT/gmail.com), Steven Merrill
-## <steven dot merrill at gmail.com>, Mark Pustjens
-## <pustjens@dds.nl> and more...
-##
-## Added by Michal Nazarewicz <mina86@mina86.com>:
-##
-## * Depending on time of last activity, activity character differs.
-##   By default, after 4 seconds an asterisk becomes a plus sign,
-##   after next 4 it becomes a colon, and finally, after another 8
-##   seconds it becomes a dot.  This can be configured via
-##   tabbar-timeouts resource.  It's format is:
-##
-##     ( <timeout> ":" <character> ":" )* <timeout> ":" <character> ":"
-##
-##   where <timeout> is timeout in seconds and <character> is a single
-##   activity character.  If activity character is (, [, { or < it
-##   will be used as left activity mark and matching character will be
-##   used on the right side.
-##
-## * If bell is ringing on a given tab it is shown on the tab bar
-##   using bell-{fg,bg} colours (if its inactive) or bell-tab-{fg,bg}
-##   if its the current tab.
-##
-##   If bell is rung on an inactive cell it is said to be ringing
-##   until that cell is selected.  If bell is rung on an active cell,
-##   it is said to be ringing for bell-timeout seconds.
-##
-##   This functionality is actually even better than activity markers
-##   if one adds \a to $PS1.
-##
-## * The "[NEW]" button can be disabled (who on Earth uses mouse to
-##   create new tab anyways?) by setting new-button resource to yes.
-##
-## * If title resource is true, tab's title is displayed after last
-##   button.  This is handy if you have terminal with no window
-##   decorations.  Colours can be configured via title-fg and
-##   title-bg.
-##
-## * As a minor modification: Final pipe character is removed (unless
-##   title is displayed).  This make tab bar look nicer.
-##
-## Incorporated from Alexey Semenko <asemenko at gmail.com> patch:
-##
-## * autohide resource.  If it's true tab bar is hidden if there is
-##   no more then one tab opened.
-##
-## Added by StephenB:
-##
-## * Tabs can be named with Shift+Up (Enter to confirm, Escape to
-##   cancel).
-##
-## * "[NEW]" button disabled by default.
-##
-## Added by Steven Merrill <steven dot merrill at gmail.com>
-##
-## * Ability to start a new tab or cycle through tabs via user
-##   commands: tabbedex:(new|next|prev)_tab .
-##   e.g. (in .Xdefaults) URxvt.keysym.M-t: perl:tabbedex:new_tab
-##   (see the urxvt man file for more info about keysym)
-##
-## * Fix an issue whereby on_user_command would not properly get sent
-##   to other extension packages if the mouse was not over the urxvt
-##   window.
-##
-## Added by Thomas Jost:
-##
-## * Add several user commands: tabbedex:rename_tab,
-##   tabbedex:move_tab_(left|right).
-##   e.g. (see 9.) URxvt.keysym.C-S-Left: perl:tabbex:move_tab_left
-##
-## * Ability to disable the default keybindings using the
-##   no-tabbedex-keys resource.
-##
-## Added by xanf (Illya Klymov):
-##
-## * Ability to display non-latin characters in tab title.
-##
-## Added by jpkotta:
-##
-## * Tabs inherit command line options.
-##
-## Added by Mark Pustjens <pustjens@dds.nl>
-##
-## * Resources are now read respecting the -name option.
-##
-## * Ability to prevent the last tab from closing.
-##   Use the following in your ~/.Xdefaults to enable:
-##   URXvt.tabbed.reopen-on-close: yes
-##
-## * Ability to change resource name prefix used by tabbedex.  For
-##   example, adding the following resource:
-##     URXvt.tabbed.tabbedex-rs-prefix: tabbedex
-##   will cause tabbedex to read "URXvt.tabbedex.*" resources.
-##
-##   [mina86@mina86.com: In original form, the change was hard-coded,
-##    I've changed it so that it can be configured and thus not break
-##    backwards compatibility with older tabbedex versions.]
-##
-## * Ability to blacklist more extensions from being loaded in the
-##   slave tabs apart from the hard coded tabbedex.  This is done with
-##   a perl-ext-blacklist resource, which is a comma separated list of
-##   extensions that must not be loaded into the slave terminals.
-##
-## Added by Jim Diamond <Jim dot Diamond at acadiau dot ca>:
-##
-## * Previous versions did not autohide the tab bar if the remaining
-##   tab had a name (as opposed to an index number).  I think "autohide"
-##   means "autohide", so I changed that behaviour.
-##
-##   [mina86@mina86.com: Added a fix to temporarily show the tab bar
-##    if renaming a tab.]
-##
-## * The name of the current tab can be changed with an escape sequence.
-##     For example, the shell command
-##         printf "\033]777;tabbedex;set_tab_name;work stuff\007"
-##     would change the name of the current tab to "work stuff".
-##
-## * Previously, if you had a lot of tabs and/or tabs with long names,
-##   the current tab might not show up in the tab bar (if its position
-##   in the tab name string was more than $self->ncol chars from the
-##   beginning).  Changes below ensure that the name of the current tab
-##   is always visible.  Arguably it would be nice to have indications
-##   at each end showing whether there are more tabs in that direction.
-##
-##   Also, when printing the tab bar, limit the length of the tab
-##   names so that one tab name doesn't occupy the whole tab bar.
-##
-## * Preserve -e option when creating new tabs (not only the first
-##   one).
-##
-## Added by 8ware:
-##
-## * Handling of special cases when moving a tab around, so first or
-##   last tab won't be swapped.
-##
-## Added by David Beniamine <david@beniamine.net>:
-##
-## * It is possible to make urxvt window urgent when bell rings in an inactive
-##   tab.  This feature can be activated with:
-##
-##       URxvt.tabbed.tab-urgent-on-bell: true
-##
-## * The URxvt.tabbed.new-tab-command resource makes it possible to customise
-##   -e command inheritance in new tabs:
-##
-##   - URxvt.tabbed.new-tab-command: inherit       -- the default (old)
-##     behaviour where -e command passed when invoking urxvt is passed to all
-##     new tabs.
-##
-##   - URxvt.tabbed.new-tab-command: clear         -- only the initial tab will
-##     use -e command passed on command line.
-##
-##   - URxvt.tabbed.new-tab-command: -e foo bar    -- the initial tab will use
-##     -e switch passed on command line, while other tabs will use -e passed in
-##     the resource.  Note that parsing of the resource simply splits on white
-##     space so you cannot to do things like ‘-e my-prog "argument with spaces"’
-##
-##   [mina86@mina86.com: changed from a boolean flag to a text configuration
-##    option.]
-##
+# TabbedEx plugin for rxvt-unicode; based on original tabbed plugin.
+# https://github.com/mina86/urxvt-tabbedex
+# Copyright (c) 2006-2016 tabbed and tabbedex authors
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=head1 NAME
+
+tabbedex - tabbed interface to urxvt; extended
+
+=head1 DESCRIPTION
+
+This transforms the terminal into a tabbar with additional terminals, that is,
+it implements what is commonly referred to as "tabbed terminal".  tabbedex is an
+extended version of the tabbed plugin which comes with urxvt.
+
+When rxvt-unicode is started with this plugin slave terminals or tabs can be
+started and switched between.  One of the terminals is the current or active one
+and it is the only one that is visible.  rxvt-unicode will exit once all tabs
+are closed.
+
+Once at least two slave terminals are created a tab bar is displayed at the top
+of the window which lists all the slave terminals.  Clicking on a number/name of
+a tab on that bar switches to given tab.
+
+=head2 Key bindings
+
+Creating new tabs, switching between them and moving them around is accomblished
+by the following key bindings:
+
+=over
+
+=item B<Shift-Down>
+
+Creates a new tab.
+
+=item B<Shift-Left> and B<Shift-Right>
+
+Switches to the tab on the left or on the right of the current tab.  Movement
+wraps around once at the first or last tab.
+
+=item B<Meta-F1> through B<Meta-F12>
+
+Switches to the first through twelfth tab.
+
+=item B<Control-Left> and B<Control-right>
+
+Move current tab to the left or right.  Wraps around once on the first/last
+position.
+
+=item B<Shift-Up>
+
+Allows current tab to be renamed.  Start typing desired new name and press
+Return to confirm or Escape to cancel.
+
+=back
+
+=head1 INSTALLATION
+
+To install the extension, copy the C<tabbedex> file into the C<~/.urxvt/ext>
+directory (create it if necessary).  This will make the plugin available for the
+current user.  Alternatively, copy it into system-wide B</usr/lib/urxvt/perl>
+directory where it will be available to anyone.
+
+To start urxvt with the extension enabled simply run C<urxvt -pe tabbedex>.  To
+make it the default, configure the B<perl-ext> or B<perl-ext-common> urxvt's
+resources.  Refer to B<RESOURCES> section of L<urxvt(1)> man page.
+
+=head1 CONFIGURATION
+
+The extension can be configured similarly to a normal terminal.  By default, it
+uses a resource class of C<URxvt.tabbed> which is the same as the tabbed
+extension.
+
+=over
+
+=item B<autohide>: I<boolean>
+
+If set (the default), the tab bar will be hidden unless there are at least two
+tabs open.  This is irrespective of whether C<NEW> button or tab's title is
+displayed.
+
+=item B<bell-fg>: I<colour index>
+
+=item B<bell-bg>: I<colour index>
+
+Foreground and background colours of an inactive tab on which bell has rung.
+(0, 3) by default which translates to black on brown/dark yellow (i.e. inverse
+of the default tab bar colours).  See I<COLOUR AND GRAPHICS> in the L<urxvt(1)>
+manpage for valid indices.
+
+=item B<bell-tab-fg>: I<colour index>
+
+=item B<bell-tab-bg>: I<colour index>
+
+Foreground and background colours of a active tab in which bell is ringing.  (5,
+4) by default which translates to magenta an blue.  See I<COLOUR AND GRAPHICS>
+in the L<urxvt(1)> manpage for valid indices.  The bell is said to be ringing on
+an active tab for B<bell-timeout> seconds after it started, see B<bell-timeout>.
+
+=item B<bell-timeout>: I<integer>
+
+Time in seconds, one second by default, a bell is said to be ringing on current
+tab for after it was rung.  Setting this to zero essentially disables the
+B<bell-tab-(fg|bg)> styling of tabs.
+
+=item B<new-button>: I<boolean>
+
+If set, a C<NEW> button will be displayed on the left of the tab bar.  Clicking
+the button creates a new tab.  It is not displayed by default.
+
+=item B<new-tab-command>: I<string>
+
+Specifies how urxvt's B<-e> switch affects tabs created by tabbedex.  The
+resource can have one of three values:
+
+=over
+
+=item I<inherit>
+
+The default.  The B<-e> command will be used by all tabs created by tabbedex.
+
+=item I<clear>
+
+Only the initial tab will use the B<-e> switch provided on urxvt's command line.
+All other tabs will act as if the option was not provided.
+
+=item I<-e B<another command>>
+
+The initial tab will use the B<-e> switch provided on urxvt's command line (if
+any) while all other tabs will use switch specified by this setting.  Note that
+parsing of the resource simply splits words on white space so things like I<-e
+my-prog "argument with spaces"> will not work.
+
+=back
+
+=item B<no-tabbedex-keys>: I<boolean>
+
+If set, the default key bindings (described at the beginning of this document)
+are not initialised.  The mappings can be recreated using urxvt's support of
+a keysym.* resource.  For example, the following will recreate all the default
+key bindings:
+
+    URxvt.tabbed.no-tabbedex-keys: yes
+    URxvt.keysym.Shift-Left: perl:tabbedex:prev_tab
+    URxvt.keysym.Shift-Right: perl:tabbedex:next_tab
+    URxvt.keysym.Shift-Down: perl:tabbedex:new_tab
+    URxvt.keysym.Shift-Up: perl:tabbedex:rename_tab
+    URxvt.keysym.Control-Left: perl:tabbedex:move_tab_left
+    URxvt.keysym.Control-Right: perl:tabbedex:move_tab_right
+    URxvt.keysym.Meta-F1: perl:tabbedex:goto_tab_1
+    URxvt.keysym.Meta-F2: perl:tabbedex:goto_tab_2
+    URxvt.keysym.Meta-F3: perl:tabbedex:goto_tab_3
+    URxvt.keysym.Meta-F4: perl:tabbedex:goto_tab_4
+    URxvt.keysym.Meta-F5: perl:tabbedex:goto_tab_5
+    URxvt.keysym.Meta-F6: perl:tabbedex:goto_tab_6
+    URxvt.keysym.Meta-F7: perl:tabbedex:goto_tab_7
+    URxvt.keysym.Meta-F8: perl:tabbedex:goto_tab_8
+    URxvt.keysym.Meta-F9: perl:tabbedex:goto_tab_9
+    URxvt.keysym.Meta-F10: perl:tabbedex:goto_tab_10
+    URxvt.keysym.Meta-F11: perl:tabbedex:goto_tab_11
+    URxvt.keysym.Meta-F12: perl:tabbedex:goto_tab_12
+
+=item B<perl-ext-blacklist>: I<string>
+
+A comma-separated list of extensions that must not be loaded into the slave
+terminals (tabs).  tabbedex plugin is implicitly added onto the list.
+
+=item B<reopen-on-close>: I<boolean>
+
+If set, whenever last tab is destroyed a new one will be created.
+
+=item B<tabbar-fg>: I<color index>
+
+=item B<tabbar-bg>: I<color index>
+
+Foreground and background colours of the tab bar.  (3, 0) by default which
+translates to brown/dark yellow on black background.  See I<COLOUR AND GRAPHICS>
+in the L<urxvt(1)> manpage for valid indices.
+
+=item B<tab-fg>: I<color index>
+
+=item B<tab-bg>: I<color index>
+
+Foreground and background colours of the current tab on the tab bar.  (0, 1) by
+default which translates to black on red.  See I<COLOUR AND GRAPHICS> in the
+L<urxvt(1)> manpage for valid indices.
+
+=item B<tabbar-timeouts>: I<string>
+
+When new text is written to an inactive tab, activity marks are displayed around
+its number (or name if it has one) on the tab bar.  By default Unicode
+characters are used to display a block which grows with time the longer it was
+since last time there was any activity in the tab.
+
+This resource allows for this to be customised.  It's format is
+
+    ( <timeout> ":" <character> ":" )* <timeout> ":" <character> ":"
+
+where <timeout> is timeout in seconds and <character> is a single activity
+character.  If activity character is (, [, { or < it will be used as left
+activity mark and matching character will be used on the right side.
+
+=item B<tabbedex-rs-prefix>: I<string>
+
+By default tabbedex uses the same prefix for resource names as tabbed plugin.
+If this is not desired, the resource can be used to set a new prefix, for
+example:
+
+    URxvt.tabbed.tabbedex-rs-prefix: tabbedex
+
+    ! Affects tabbed only:
+    URxvt.tabbed.tabbar-fg: 4
+    URxvt.tabbed.tabbar-bg: 0
+
+    ! Affects tabbedex only:
+    URxvt.tabbed.tabbar-fg: 5
+    URxvt.tabbed.tabbar-bg: 0
+
+This settings does not affect the B<tabbedex-rs-prefix> resource itself which is
+always read from C<URxvt.tabbed.tabbedex-rs-prefix>.
+
+=item B<title>: I<boolean>
+
+If set (the default), when tab bar is visible and there is enough space left,
+current tab's title will be displayed after the last tab.
+
+=item B<title-fg>: I<color inde>
+
+=item B<title-bg>: I<color inde>
+
+Foreground and background colours of the tab title.  (2, 0) by default which
+translates to green on black.  Only used when B<title> is true.  See I<COLOUR
+AND GRAPHICS> in the L<urxvt(1)> manpage for valid indices.
+
+=back
+
+=head1 USER COMMANDS
+
+tabbedex supports several user commands which can be used with
+B<URxvt.keysym>.I<keysym> resource as well as other places.  The commands are:
+
+=over
+
+=item B<tabbedex:new_tab>
+
+Creates a new tab.
+
+=item B<tabbedex:next_tab> and B<tabbedex:prev_tab>
+
+Switches to the tab on the right or left of the current tab.
+
+=item B<tabbedex:move_tab_left> and B<tabbedex:move_tab_right>
+
+Moves the current tab left or right.
+
+=item B<goto_tab_>I<N> where I<N> is positive integer
+
+Switches to the tab given by the number I<N>
+
+=back
+
+=head1 OSC SEQUENCES
+
+tabbedex supports a single OSC sequence which can be invoked by programs running
+in the terminal by writing a special sequence, namely I<ESC ] 777 ; string ST>
+where I<string> is the command to execute.  For example:
+
+    printf '\033]777;tabbedx;set_tab_name;%s\007' "foo"
+
+=over
+
+=item B<tabbedex;set_tab_name;>I<name>
+
+Sets name of the current tab to I<name>.
+
+=back
+
+=cut
 
 use Encode qw(decode);
 
