@@ -23,7 +23,7 @@ log () {
 	echo "$*" >&2
 }
 
-git="$(which git 2>/dev/null)"
+git=$(which git 2>/dev/null) || true
 
 if [ -z "$git" ]; then
 	log 'Downloading and extracting the package to ~/.urxvt/tabbedex'
