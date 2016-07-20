@@ -7,83 +7,62 @@
 _() {
 
 url=https://github.com/mina86/urxvt-tabbedex
-git="$(which git 2>/dev/null)"
 
 set -eu
 
-mkdir -p ~/.urxvt
-cd ~/.urxvt
-
-if [ -e urxvt-tabbedex ]; then
-	echo '~/.urxvt/urxvt-tabbedex already exist, overwrite? [y/N]'
-	read ans
-	case $ans in
-	y|yes|Y|YES)
-	;;
-	*)
-		exit 1;
-	esac
+if [ -e ~/.urxvt/tabbedex ]; then
+	printf >&2 '~/.urxvt/tabbedex already exist, overwrite? [y/N] '
+	if ! read ans || [ "$ans" != y ]; then
+		echo >&2 'Aborting'
+		exit 1
+	fi
 fi
+
+log () {
+	echo >&2
+	echo "$*" >&2
+}
+
+git="$(which git 2>/dev/null)"
 
 if [ -z "$git" ]; then
-	if [ -e urxvt-tabbedex ]; then
-		rm -rf -- urxvt-tabbedex
-	fi
-	(
-		set -x
-		curl "$url/archive/master.zip"
-		unzip master.zip
-		rm master.zip
-		exec mv urxvt-tabbedex-master urxvt-tabbedex
-	)
-		cd urxvt-tabbedex
-elif [ -e urxvt-tabbedex/.git ]; then
-	cd urxvt-tabbedex
-	(
-		set -x
-		git remote update
-		exec git reset --hard origin/master
-	)
+	log 'Downloading and extracting the package to ~/.urxvt/tabbedex'
+	mkdir -p ~/.urxvt/tabbedex && cd ~/.urxvt/tabbedex
+	curl -L "$url/archive/master.tar.gz" |
+		tar vzx --exclude=.gitignore --strip-components=1
+
+elif [ -e ~/.urxvt/tabbedex/.git ]; then
+	log 'Updating the repository'
+	cd ~/.urxvt/tabbedex
+	git remote update
+	git reset --hard origin/master
+
 else
-	if [ -e urxvt-tabbedex ]; then
-		(set -x; exec rm -rf -- urxvt-tabbedex)
+	if [ -e ~/.urxvt/tabbedex ]; then
+		log 'Deleting ~/.urxvt/tabbedex'
+		rm -rf -- ~/.urxvt/tabbedex
 	fi
-	(set -x; exec git clone "$url")
-	cd urxvt-tabbedex
+	log 'Cloning the repository to ~/.urxvt/tabbedex'
+	mkdir -p ~/.urxvt
+	git clone "$url" ~/.urxvt/tabbedex
+	cd ~/.urxvt/tabbedex
 fi
 
-case "$(id -u):$git" in
-0:*)
-	echo 'Running as super user, installing globally.'
+case "$(id -u)" in
+0)
+	log 'Running as super user, installing globally.'
 	make install
-	echo
-	echo 'You can re-run this script to update the extension.'
 	;;
 
-*:?*)
-	echo 'Running as regular user, installing locally'
-	make install-local
-	echo
-	echo 'You can re-run this script to update the extension.'
-	;;
-
-*:?*)
-	echo 'Running as regular user, installing symbolic links locally'
+*)
+	log 'Running as regular user, installing symbolic links locally'
 	make install-local-symlink
-	make install-local-symlink
-	cat <<EOF
-
-You can run
-
-    cd ~/.urxvt/urxvt-tabbedex &&
-    git pull &&
-    git reset --hard origin/master &&
-    make
-
-to update the extension.
-EOF
 esac
 
+log 'You can re-run this script to update the extension.'
+
+# Exit so that if this script got longer (if user run it from the repository),
+# shell will not try to execute anything past its cursor in the file.
 exit
 }
 
