@@ -259,6 +259,10 @@ Moves the current tab left or right.
 
 Switches to the tab given by the number I<N>
 
+=item B<tabbedex:kill_tab>
+
+Kills/destroys current tab.
+
 =back
 
 =head1 OSC SEQUENCES
@@ -888,6 +892,9 @@ sub tab_user_command {
   }
   elsif ($cmd eq 'tabbedex:rename_tab') {
     $self->rename_tab($tab);
+  }
+  elsif ($cmd eq 'tabbedex:kill_tab') {
+    $tab->destroy;
   }
   else {
     # Proxy the user command through to the tab's term, while taking care not
