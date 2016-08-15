@@ -617,9 +617,17 @@ sub key_event {
 	my ($self, $type, $event) = @_;
 	my $term = $self->{cur};
 	$term->$type($event->{state}, $event->{keycode}, $event->{time});
-	# refresh_check is available since rxvt-unicode 9.22.
-	if ($term->can('refresh_check')) {
+
+	# refresh_check is available since rxvt-unicode 9.22.  For some reason
+	# $term->can('refresh_check') doesn’t work which is why eval block is
+	# used to silence warnings.
+	eval {
 		$term->refresh_check;
+	};
+	if ($@ && $@ !~ /refresh_check/) {
+		# If there was a warning unrelated to refresh_check propagate
+		# it.  Otherwise ignore.
+		warn "$@";
 	}
 	1;
 }
