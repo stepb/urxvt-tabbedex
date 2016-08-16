@@ -236,6 +236,18 @@ AND GRAPHICS> in the L<urxvt(1)> manpage for valid indices.
 
 =back
 
+Extension's behaviour is also influenced by some of URxvt's configuration
+options as well.  (See I<RESOURCES> in the L<urxvt(1)> manpage for more information about them).  The options include:
+
+=over
+
+=item B<urgentOnBell>
+
+If set, when bell rings in an inactive tab, the master terminal's urgency hint
+is set.
+
+=back
+
 =head1 USER COMMANDS
 
 tabbedex supports several user commands which can be used with
