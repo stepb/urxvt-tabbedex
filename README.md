@@ -27,8 +27,8 @@ Running this command again (or executing `sh
 
 ## Enabling the extension
 
-The plugin can be tested without enabling it by default by using
-urxvt’s the `-pe` switch as follows:
+The plugin can be tested, without enabling it by default, by using
+urxvt’s `-pe` switch as follows:
 
     urxvt -pe tabbedex
 
