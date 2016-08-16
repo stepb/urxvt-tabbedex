@@ -241,6 +241,10 @@ options as well.  (See I<RESOURCES> in the L<urxvt(1)> manpage for more informat
 
 =over
 
+=item B<mapAlert>
+
+If set, when bell rings in an inactive tab, the tab is made active.
+
 =item B<urgentOnBell>
 
 If set, when bell rings in an inactive tab, the master terminal's urgency hint
@@ -732,6 +736,8 @@ sub on_init {
    $self->{reopen_on_close} = $self->rs_bool ('reopen-on-close', 0);
    $self->{tab_urgent_on_bell} =
      $self->x_resource_boolean ('urgentOnBell') // 0;
+   $self->{map_on_bell} =
+     $self->x_resource_boolean ('mapAlert') // 0;
    $self->{new_tab_command} = $self->rs_text ('new-tab-command', 'inherit');
 
    $self->register_keysyms;
@@ -865,15 +871,23 @@ sub tab_property_notify {
 
 
 sub tab_bell {
-    my ($self, $tab, $event) = @_;
-    my $now = int urxvt::NOW;
-    my $bell = $self->tab_bell_active($tab, $now);
-    $tab->{bell_rung} = $now;
-    $self->refresh if $bell ne $self->tab_bell_active($tab, $now);
-    if ($tab != $self->{cur} && $self->{tab_urgent_on_bell}) {
-        $self->{term}->set_urgency(1);
-    }
-    ();
+	my ($self, $tab, $event) = @_;
+	my $now = int urxvt::NOW;
+	my $bell = $self->tab_bell_active($tab, $now);
+	$tab->{bell_rung} = $now;
+	if ($tab != $self->{cur}) {
+		if ($self->{map_on_bell}) {
+			$self->make_current($tab);
+			undef $bell;
+		}
+		if ($self->{tab_urgent_on_bell}) {
+			$self->{term}->set_urgency(1);
+		}
+	}
+	if (defined $bell && $bell ne $self->tab_bell_active($tab, $now)) {
+		$self->refresh;
+	}
+	();
 }
 
 
