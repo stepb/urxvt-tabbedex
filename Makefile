@@ -21,7 +21,7 @@ install-local: tabbedex urxvt-tabbedex.1
 # TODO: This assumes user has ~/bin in their PATH:
 	install -D -m 644 urxvt-tabbedex.1 ~/man/man1/urxvt-tabbedex.1
 
-install-local-symlink:tabbedex urxvt-tabbedex.1
+install-local-symlink: tabbedex urxvt-tabbedex.1
 	mkdir -m 755 -p ~/.urxvt/ext ~/man/man1/
 	ln -sf "$(shell realpath tabbedex)" ~/.urxvt/ext
 	ln -sf "$(shell realpath urxvt-tabbedex.1)" ~/man/man1/
