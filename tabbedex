@@ -215,8 +215,8 @@ example:
     URxvt.tabbed.tabbar-bg: 0
 
     ! Affects tabbedex only:
-    URxvt.tabbed.tabbar-fg: 5
-    URxvt.tabbed.tabbar-bg: 0
+    URxvt.tabbedex.tabbar-fg: 5
+    URxvt.tabbedex.tabbar-bg: 0
 
 This settings does not affect the B<tabbedex-rs-prefix> resource itself which is
 always read from C<URxvt.tabbed.tabbedex-rs-prefix>.
