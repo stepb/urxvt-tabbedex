@@ -606,6 +606,10 @@ sub tab_user_command {
   elsif ($cmd eq 'tabbedex:rename_tab') {
     $self->rename_tab($tab);
   }
+  elsif ($cmd =~ /tabbedex:tab_\d$/){
+	  #my $num = substr($cmd,-1);
+          $self->make_current ($self->{tabs}[substr($cmd,-1)]);
+  }
   else {
     # Proxy the user command through to the tab's term, while taking care not
     # to get caught in an infinite loop.
