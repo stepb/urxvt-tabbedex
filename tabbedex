@@ -814,9 +814,13 @@ sub on_user_command {
 
 
 sub on_wm_delete_window {
-   my ($self) = @_;
-   $_->destroy for @{ $self->{tabs} };
-   1;
+	my ($self) = @_;
+	# Disable reopen-on-close so we respect delete window request.  If
+	# reopen-on-close was to remain true, as soon as last tab was closed
+	# a new would be created and we would never exit.
+	$self->{reopen_on_close} = 0;
+	$_->destroy for @{ $self->{tabs} };
+	1;
 }
 
 
