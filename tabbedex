@@ -1,7 +1,7 @@
 #! perl
 # TabbedEx plugin for rxvt-unicode; based on original tabbed plugin.
 # https://github.com/mina86/urxvt-tabbedex
-# Copyright (c) 2006-2016 tabbed and tabbedex authors
+# Copyright (c) 2006-2018 tabbed and tabbedex authors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -271,9 +271,10 @@ Switches to the tab on the right or left of the current tab.
 
 Moves the current tab left or right.
 
-=item B<goto_tab_>I<N> where I<N> is positive integer
+=item B<goto_tab_>I<N>
 
-Switches to the tab given by the number I<N>
+If I<N> is a positive integer, switches to the I<N>th tab.  If I<N> is
+a negative integer, switches to the I<N>th tab counting from the last one.
 
 =item B<tabbedex:kill_tab>
 
@@ -921,8 +922,13 @@ sub tab_user_command {
   elsif ($cmd eq 'tabbedex:move_tab_right') {
     $self->move_tab($tab, 1);
   }
-  elsif ($cmd =~ /^tabbedex:goto_tab_(\d+)$/) {
-    $self->change_to_tab($tab, $1 - 1);
+  elsif ($cmd =~ /^tabbedex:goto_tab_(-?\d+)$/) {
+    if ($1 != 0 && !$self->{is_inputting_name} && @{ $self->{tabs} } > 1) {
+      my $idx = $1 > 0 ? ($1 - 1) : (@{ $self->{tabs} } + $1);
+      if ($idx >= 0 && $idx < @{ $self->{tabs} }) {
+        $self->make_current ($self->{tabs}[$idx]);
+      }
+    }
   }
   elsif ($cmd eq 'tabbedex:rename_tab') {
     $self->rename_tab($tab);
@@ -951,16 +957,6 @@ sub change_tab {
         ++$idx while $self->{tabs}[$idx] != $tab;
         $idx += $direction;
         $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
-    }
-
-    ();
-}
-
-sub change_to_tab {
-    my ($self, $tab, $idx) = @_;
-
-    if (!$self->{is_inputting_name} && @{ $self->{tabs} } > 1 && $idx >= 0 && $idx < @{ $self->{tabs} }) {
-        $self->make_current ($self->{tabs}[$idx]);
     }
 
     ();
