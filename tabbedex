@@ -841,29 +841,29 @@ sub tab_start {
 sub tab_destroy {
 	my ($self, $tab) = @_;
 
-	if ($self->{reopen_on_close} && $#{ $self->{tabs} } == 0) {
-		$self->new_tab;
-		$self->make_current ($self->{tabs}[-1]);
-	}
-
 	my $idx = 0;
 	++$idx while $self->{tabs}[$idx] != $tab;
 	splice @{ $self->{tabs} }, $idx, 1;
-	$self->update_autohide ();
 
-	if (@{ $self->{tabs} }) {
-		if ($self->{cur} == $tab) {
-			delete $self->{cur};
-			$idx = $idx < @{ $self->{tabs} } ? $idx : -1;
-			$self->make_current($self->{tabs}[$idx]);
-		} else {
-			$self->refresh;
+	if (!@{ $self->{tabs} }) {
+		if (!$self->{reopen_on_close}) {
+			# Delay destruction a tiny bit.
+			$self->{destroy} = urxvt::iw->new->start->cb(sub {
+				$self->destroy;
+			});
+			return ();
 		}
+		$self->new_tab;
+	}
+
+	$self->update_autohide;
+
+	if ($self->{cur} == $tab) {
+		delete $self->{cur};
+		$idx = $idx < @{ $self->{tabs} } ? $idx : -1;
+		$self->make_current($self->{tabs}[$idx]);
 	} else {
-		# delay destruction a tiny bit
-		$self->{destroy} = urxvt::iw->new->start->cb(sub {
-			$self->destroy;
-		});
+		$self->refresh;
 	}
 
 	();
