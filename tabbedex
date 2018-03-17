@@ -1102,8 +1102,15 @@ package urxvt::ext::tabbedex::tab;
 }
 
 sub tab_name {
-    my ($tab, $idx, $max_len) = @_;
-    return substr($tab->{name} || ($idx + 1), -$max_len);
+	my ($tab, $idx, $max_len) = @_;
+	my $name = '' . ($tab->{name} || ($idx + 1));
+	if ($max_len < 2) {
+		substr($name, -1);
+	} elsif (length $name > $max_len) {
+		'…' . substr($name, -$max_len + 1);
+	} else {
+		$name;
+	}
 }
 
 sub index($) {
