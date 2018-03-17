@@ -976,27 +976,26 @@ sub change_tab {
 }
 
 sub move_tab {
-  my ($self, $tab, $direction) = @_;
+	my ($self, $tab, $direction) = @_;
+	if (@{ $self->{tabs} } < 2) {
+		return;
+	}
 
-  if (@{ $self->{tabs} } > 1) {
-    my $last = $#{$self->{tabs}};
-    my $idx = $tab->index;
+	my $last = $#{$self->{tabs}};
+	my $idx = $tab->index;
 
-    if ($idx == 0 && $direction == -1) {
-      push @{$self->{tabs}}, shift @{$self->{tabs}};
-      $idx = $last;
-    } elsif ($idx == $last && $direction == 1) {
-      unshift @{$self->{tabs}}, pop @{$self->{tabs}};
-      $idx = 0;
-    } else {
-      ($self->{tabs}[$idx], $self->{tabs}[$idx + $direction]) =
-        ($self->{tabs}[$idx + $direction], $self->{tabs}[$idx]);
-      $idx += $direction;
-    }
-    $self->make_current ($self->{tabs}[$idx]);
-  }
-
-  ();
+	if ($idx == 0 && $direction == -1) {
+		push @{$self->{tabs}}, shift @{$self->{tabs}};
+		$idx = $last;
+	} elsif ($idx == $last && $direction == 1) {
+		unshift @{$self->{tabs}}, pop @{$self->{tabs}};
+		$idx = 0;
+	} else {
+		($self->{tabs}[$idx], $self->{tabs}[$idx + $direction]) =
+			($self->{tabs}[$idx + $direction], $self->{tabs}[$idx]);
+		$idx += $direction;
+	}
+	$self->refresh;
 }
 
 
