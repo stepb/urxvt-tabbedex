@@ -992,6 +992,21 @@ sub move_tab {
   ();
 }
 
+
+sub _is_escape($$) {
+	my ($event, $keysym) = @_;
+	return 1 if $keysym == 0xff1b;  # Escape
+	return 0 unless $event->{state} & urxvt::ControlMask;
+	$keysym == 99 || $keysym == 67;  # Ctrl+C
+}
+
+sub _is_backspace($$) {
+	my ($event, $keysym) = @_;
+	return 1 if $keysym == 0xff08;  # Backspace
+	return 0 unless $event->{state} & urxvt::ControlMask;
+	$keysym == 104 || $keysym == 72;  # Ctrl+H
+}
+
 sub rename_tab__key_press {
 	my ($tab, $event, $keysym, $octets) = @_;
 
@@ -1003,18 +1018,18 @@ sub rename_tab__key_press {
 		return 0;
 	}
 
-	if ($keysym == 0xff0d || $keysym == 0xff8d ||  # Enter
-	    $keysym == 0xff1b) {  # Escape
-		if ($keysym == 0xff1b) {
-			$tab->{name} = $tab->{old_name};
-		} else {
+	my $is_enter = $keysym == 0xff0d || $keysym == 0xff8d;
+	if ($is_enter || _is_escape $event, $keysym) {
+		if ($is_enter) {
 			substr $tab->{name}, -1, 1, '';
+		} else {
+			$tab->{name} = $tab->{old_name};
 		}
 		delete $tab->{old_name};
 		$tab->{term}{parent}->{is_inputting_name} = 0;
 		$tab->{term}{parent}->update_autohide (1);
 		$tab->disable('key_press');
-	} elsif ($keysym == 0xff08) {  # Backspace
+	} elsif (_is_backspace $event, $keysym) {
 		substr $tab->{name}, -2, 1, '';
 	} elsif ($octets !~ /[\x00-\x1f\x80-\xaf]/) {
 		substr $tab->{name}, -1, 0, $octets;
