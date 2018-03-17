@@ -993,48 +993,50 @@ sub move_tab {
 }
 
 sub rename_tab {
-    my ($self, $tab) = @_;
+	my ($self, $tab) = @_;
+	if ($self->{is_inputting_name}) {
+		return;
+	}
 
-    if (!$self->{is_inputting_name}) {
-        $self->{is_inputting_name} = 1;
-        $tab->{old_name} = $tab->{name} ? $tab->{name} : "";
-        $tab->{new_name} = "";
-        $tab->{name} = "█";
-        $self->update_autohide (1);
-        $self->refresh;
+	$self->{is_inputting_name} = 1;
+	$tab->{old_name} = $tab->{name} ? $tab->{name} : "";
+	$tab->{new_name} = "";
+	$tab->{name} = "█";
+	$self->update_autohide (1);
+	$self->refresh;
 
-        $tab->enable('key_press', sub {
-            # rxvt-unicode-scroll-bug-fix.patch causes early key_press events to
-            # be passed without $keysym or $octects arguments passed.  Work
-            # around it by ignoring such invocations; we’ll be called again soon
-            # with all those arguments.  The patch shouldn’t be used any more
-            # anyway.
-            if (@_ == 2) {
-                    return 0;
-            }
+	$tab->enable('key_press', sub {
+		# rxvt-unicode-scroll-bug-fix.patch causes early key_press
+		# events to be passed without $keysym or $octects arguments
+		# passed.  Work around it by ignoring such invocations; we’ll be
+		# called again soon with all those arguments.  The patch
+		# shouldn’t be used any more anyway.
+		if (@_ == 2) {
+			return 0;
+		}
 
-            my ($tab, $event, $keysym, $octets) = @_;
+		my ($tab, $event, $keysym, $octets) = @_;
 
-            if ($keysym == 0xff0d || $keysym == 0xff8d) { # enter
-                $tab->{name} = $tab->{new_name};
-                $self->{is_inputting_name} = 0;
-                $tab->disable('key_press');
-                $self->update_autohide (1);
-            } elsif ($keysym == 0xff1b) { # escape
-                $tab->{name} = $tab->{old_name};
-                $self->{is_inputting_name} = 0;
-                $self->update_autohide (1);
-            } elsif ($keysym == 0xff08) { # backspace
-                substr $tab->{new_name}, -1, 1;
-                $tab->{name} = $tab->{new_name} . '█';
-            } elsif ($octets !~ /[\x00-\x1f\x80-\xaf]/) {
-                $tab->{new_name} .= $octets;
-                $tab->{name} = $tab->{new_name} . '█';
-            }
-            $self->refresh;
-            return 1;
-        });
-    }
+		if ($keysym == 0xff0d || $keysym == 0xff8d ||  # Enter
+		    $keysym == 0xff1b) {  # Escape
+			$tab->{name} = $keysym == 0xff1b ? $tab->{old_name}
+			                                 : $tab->{new_name};
+			delete $tab->{old_name};
+			delete $tab->{new_name};
+			$self->{is_inputting_name} = 0;
+			$tab->disable('key_press');
+			$self->update_autohide (1);
+		} else {
+			if ($keysym == 0xff08) { # backspace
+				substr $tab->{new_name}, -1, 1, '';
+			} elsif ($octets !~ /[\x00-\x1f\x80-\xaf]/) {
+				$tab->{new_name} .= $octets;
+			}
+			$tab->{name} = $tab->{new_name} . '█';
+		}
+		$self->refresh;
+		return 1;
+	});
 }
 
 
