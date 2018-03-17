@@ -571,32 +571,33 @@ sub rs_color($$$$) {
 
 
 sub make_current {
-    my ($self, $tab) = @_;
+	my ($self, $tab) = @_;
 
-    my $cur = $self->{cur};
-    if ($cur != $tab) {
-        if ($cur) {
-            delete $cur->{last_activity};
-            delete $cur->{bell_rung};
-            $cur->XUnmapWindow ($cur->parent) if $cur->mapped;
-            $cur->focus_out;
-        }
+	my $cur = $self->{cur};
+	if ($cur == $tab) {
+		return;
+	}
 
-        $self->{cur} = $tab;
+	if ($cur) {
+		delete $cur->{last_activity};
+		delete $cur->{bell_rung};
+		$cur->XUnmapWindow ($cur->parent) if $cur->mapped;
+		$cur->focus_out;
+	}
 
-        $self->configure;
-        $self->copy_properties;
+	$self->{cur} = $tab;
 
-        $tab->focus_out; # just in case, should be a nop
-        $tab->focus_in if $self->focus;
+	$self->configure;
+	$self->copy_properties;
 
-        $tab->XMapWindow ($tab->parent);
-        delete $tab->{last_activity};
-        delete $tab->{bell_rung};
-    }
-    $self->refresh;
+	$tab->focus_out; # just in case, should be a nop
+	$tab->focus_in if $self->focus;
 
-    ();
+	$tab->XMapWindow ($tab->parent);
+	delete $tab->{last_activity};
+	delete $tab->{bell_rung};
+
+	$self->refresh;
 }
 
 
@@ -827,16 +828,11 @@ sub on_wm_delete_window {
 
 
 sub tab_start {
-   my ($self, $tab) = @_;
-
-   $tab->XChangeInput ($tab->parent, urxvt::PropertyChangeMask);
-
-   push @{ $self->{tabs} }, $tab;
-
-#   $tab->{name} ||= scalar @{ $self->{tabs} };
-   $self->make_current ($tab);
-
-   ();
+	my ($self, $tab) = @_;
+	$tab->XChangeInput ($tab->parent, urxvt::PropertyChangeMask);
+	push @{ $self->{tabs} }, $tab;
+	$self->make_current($tab);
+	();
 }
 
 
