@@ -375,10 +375,10 @@ sub refresh {
    my ($ofs, $idx, @ofs) = (0, 0);
 
    if ($self->{new_button}) {
-      substr $text, 0, 7, "[NEW] |";
-      @$rend[0 .. 5] = ($self->{rs_tab}[1]) x 6;
-      push @ofs, [0, 6, -1 ];
-      $ofs = 7;
+      substr $text, 0, 6, "[NEW]|";
+      @$rend[0 .. 4] = ($self->{rs_tab}[1]) x 5;
+      push @ofs, [0, 5, -1 ];
+      $ofs = 6;
    }
 
    my $space_available = $ofs;
@@ -650,23 +650,25 @@ sub key_event {
 }
 
 sub on_button_release {
-   my ($self, $event) = @_;
+	my ($self, $event) = @_;
 
-   if (!$self->{is_inputting_name} && $event->{row} == 0) {
-      my $col = $event->{col};
-      for my $button (@{ $self->{tabofs} }) {
-         last if     $col <  $button->[0];
-         next unless $col <= $button->[1];
-         if ($button->[2] == -1) {
-            $self->new_tab;
-         } else {
-            $self->make_current($self->{tabs}[$button->[2]]);
-         }
-      }
-      return 1;
-   }
+	if ($self->{is_inputting_name} || $event->{row} != 0) {
+		return ();
+	}
 
-   ();
+	my $col = $event->{col};
+	for my $button (@{ $self->{tabofs} }) {
+		if ($col < $button->[0]) {
+			last;
+		} elsif ($col >= $button->[1]) {
+			# nop
+		} elsif ($button->[2] == -1) {
+			$self->new_tab;
+		} else {
+			$self->make_current($self->{tabs}[$button->[2]]);
+		}
+	}
+	1;
 }
 
 sub register_keysyms {
