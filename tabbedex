@@ -361,95 +361,153 @@ sub matching_activity_mark {
 }
 
 
+# Determines which tabs are to be displayed in tabbar.  The one requirement is
+# that current tab and tabs on both sides of it must be visible.  Apart from
+# that, the method tries to cram as many tabs as possible.
+#
+# Returns a ($first, $last) pair indicating index of first and last (inclusive)
+# tab to be shown in the tabbar.
+sub _tabbar_span {
+	my ($self, $ncol, $names) = @_;
+
+	++$ncol;
+	my $max = int(($ncol - 9) / 3);
+	my $len = sub {
+		my $l = length $names->[$_[0]];
+		($l > $max ? $max : $l) + 3
+	};
+
+	my $i = 0;
+	for (my $keep_going = 1; $keep_going && $i < @$names; ++$i) {
+		$ncol -= $len->($i);
+		$keep_going = !$i || $self->{tabs}[$i - 1] != $self->{cur};
+	}
+
+	my $first = 0;
+	while ($ncol < 0) {
+		$ncol += $len->($first++);
+	}
+
+	while ($i < @$names && ($ncol -= $len->($i)) >= 0) {
+		++$i;
+	}
+
+	($first, $i - 1)
+}
+
+# Determines largest tab name length limit which guarantees that all tabs in
+# given range can be displayed in the tabbar.
+sub _best_max_width($$$$) {
+	my ($ncol, $names, $first, $last) = @_;
+
+	$ncol -= 3 * ($last - $first) + 2;
+	my $max = int($ncol / ($last - $first + 1));
+	my @lens = sort { $a <=> $b }
+	           grep { if ($_ <= $max) { $ncol -= $_; 0 } else { 1 } }
+	           map  { length }
+	           @{ $names }[$first .. $last];
+	while (@lens) {
+		$max = int($ncol / @lens);
+		last if $lens[0] > $max;
+		do {
+			$ncol -= shift @lens;
+		} while (@lens && $lens[0] <= $max);
+	}
+	$max;
+}
+
+# Returns a function which yields $name for tab with given index.  Takes
+# ($max_length, \@names) as arguments.
+sub _tab_name_getter($$) {
+	my ($max_len, $names) = @_;
+	if (!defined $max_len) {
+		return sub { $names->[$_[0]] };
+	} elsif ($max_len < 2) {
+		return sub { substr $names->[$_[0]], -1 };
+	} else {
+		return sub {
+			my $n = $names->[$_[0]];
+			if ($max_len < length $n) {
+				'…' . substr $n, -($max_len - 1);
+			} else {
+				$n;
+			}
+		};
+	}
+}
+
+# Collects names of all the tabs and figures out how much of a tab name can be
+# shown and how many tabs must be omitted.  Returns three values, ($first,
+# $last, \&get_name), where:
+# - $first is index of the first tab which should be displayed,
+# - $last is index of the last tab which should be displayed and
+# - \&get_name is a subroutine which returns $name of tab with given index.
+# The method takes one argument $ncol which is space available to display tabs.
+sub _size_tabs_for_refresh {
+	my ($self, $ncol) = @_;
+
+	# Construct array of lengths.
+	my $total = -1;
+	my @names = map {
+		my $name = $self->{tabs}[$_]{name} || '' . ($_ + 1);
+		$total += 3 + length $name;
+		$name
+	} 0..$#{ $self->{tabs} };
+
+	# All tabs fit with no truncation.  Short circuit the whole function.
+	my ($first, $last, $max) = (0, $#names);
+	if ($total > $ncol) {
+		if (@names > 3) {
+			($first, $last) = $self->_tabbar_span($ncol, \@names);
+		}
+		$max = _best_max_width $ncol, \@names, $first, $last;
+	}
+
+	($first, $last, _tab_name_getter $max, \@names);
+}
+
 sub refresh {
-   my ($self) = @_;
+	my ($self) = @_;
 
-   # autohide makes it zero
-   return unless $self->{tabheight};
+	# autohide makes it zero
+	return unless $self->{tabheight};
 
-   my $ncol = $self->ncol;
+	my $bar = new urxvt::ext::tabbedex::tabbar($self);
 
-   my $text = " " x $ncol;
-   my $rend = [($self->{rs_tabbar}) x $ncol];
+	if ($self->{new_button}) {
+		$bar->add_button('[NEW]', 1, -1);
+	}
 
-   my ($ofs, $idx, @ofs) = (0, 0);
+	my ($idx, $last, $get_name) = $self->_size_tabs_for_refresh(
+		$bar->space_left);
 
-   if ($self->{new_button}) {
-      substr $text, 0, 6, "[NEW]|";
-      @$rend[0 .. 4] = ($self->{rs_tab}[1]) x 5;
-      push @ofs, [0, 5, -1 ];
-      $ofs = 6;
-   }
+	for (my $now = int urxvt::NOW; $idx <= $last; ++$idx) {
+		my $name = $get_name->($idx);
+		my $tab = $self->{tabs}[$idx];
+		my $color_idx = (2 * $self->tab_bell_active($tab, $now) +
+		                 ($tab == $self->{cur}));
+		my $act = $self->tab_activity_mark($tab, $now);
+		$name = $act . $name . matching_activity_mark($act);
+		$bar->add_button($name, $color_idx, $idx);
+	}
 
-   my $space_available = $ofs;
-   my $max_len = int(($ncol - $ofs - 5) / ($#{ $self->{tabs} } > 1 ? 3 : 2));
+	if ($self->{tab_title} && $bar->space_left > 1) {
+		my $term = $self->{term};
+		my @str = $term->XGetWindowProperty(
+			$term->parent, $self->{tab_title});
+		if (@str && $str[2]) {
+			my $str = decode('utf8', $str[2]);
+			my $len = length $str;
+			my $available = $bar->space_left - 1;
+			if ($len > $available) {
+				substr($str, $available) = '';
+			}
+			$bar->add_title(' ' . $str);
+		}
+	}
 
-   # See if the name of the current tab would be displayed;
-   # if not, compute the number of tabs to skip so that the
-   # name of the current tab will be displayed.
-   my $len = $ofs;
-   my @ends;
-   for my $tab (@{ $self->{tabs} }) {
-      my $name = $tab->tab_name($idx, $max_len);
-      ++$idx;
-      $len += length($name) + 3;        # '| ' and ' '
-      if ($tab == $self->{cur}) {
-         $idx = 0;
-         if ($len > $ncol + 1) {
-            for my $end (@ends) {
-               ++$idx;
-               if ($len - $end <= $ncol) {
-                  last;
-               }
-            }
-         }
-         last;
-      }
-      push @ends, $len;
-   }
-
-   my $now = int urxvt::NOW;
-
-   for (; $idx < @{ $self->{tabs} }; ++$idx) {
-      my $tab = $self->{tabs}[$idx];
-      my $name = $tab->tab_name($idx, $max_len);
-      my $act = $self->tab_activity_mark($tab, $now);
-      my $txt = sprintf "%s%s%s", $act, $name, matching_activity_mark $act;
-      my $len = length $txt;
-
-      substr $text, $ofs, $len + 1, "$txt|";
-
-      my $color = $self->{rs_tab}[
-         2 * $self->tab_bell_active($tab, $now) + ($tab == $self->{cur})
-      ];
-      if (defined $color) {
-         @$rend[$ofs .. $ofs + $len - 1] = ($color) x $len;
-      }
-
-      push @ofs, [ $ofs, $ofs + $len, $idx ];
-      $ofs += $len + 1;
-   }
-
-   substr $text, --$ofs, 1, ' '; # remove last '|'
-
-   if ($self->{tab_title} && $ofs + 3 < $ncol) {
-      my $term = $self->{term};
-      my @str = $term->XGetWindowProperty($term->parent, $self->{tab_title});
-      if (@str && $str[2]) {
-         my $str = '| ' . decode("utf8", $str[2]);
-         my $len = length $str;
-         $len = $ncol - $ofs if $ofs + $len > $ncol;
-         substr $text, $ofs, $len, substr $str, 0, $len;
-         @$rend[$ofs + 2 .. $ofs + $len - 1] = ($self->{rs_title}) x ($len - 2);
-      }
-   }
-
-   $self->{tabofs} = \@ofs;
-
-   $self->ROW_t (0, $text, 0, 0, $ncol);
-   $self->ROW_r (0, $rend, 0, 0, $ncol);
-
-   $self->want_refresh;
+	$bar->apply;
+	$self->want_refresh;
 }
 
 
@@ -1101,22 +1159,68 @@ package urxvt::ext::tabbedex::tab;
    }
 }
 
-sub tab_name {
-	my ($tab, $idx, $max_len) = @_;
-	my $name = '' . ($tab->{name} || ($idx + 1));
-	if ($max_len < 2) {
-		substr($name, -1);
-	} elsif (length $name > $max_len) {
-		'…' . substr($name, -$max_len + 1);
-	} else {
-		$name;
-	}
-}
-
 sub index($) {
 	my $tab = shift;
 	my $parent = $tab->{term}{parent};
 	my $idx = 0;
 	++$idx while $parent->{tabs}[$idx] != $tab;
 	$idx;
+}
+
+
+package urxvt::ext::tabbedex::tabbar;
+
+sub new {
+	my ($class, $parent) = @_;
+	$#{ $parent->{tabofs} } = -1;
+	bless {
+		parent => $parent,
+		text => '',
+		rend => [],
+		ncol => $parent->ncol,
+		buttons => $parent->{tabofs},
+		pipe_pending => 0,
+	}, $class;
+}
+
+sub _append {
+	my ($bar, $text, $c) = @_;
+	$bar->{text} .= $text;
+	push @{$bar->{rend}}, ($c // $bar->{parent}{rs_tabbar}) x length $text;
+}
+
+sub _append_pending_pipe_maybe {
+	my ($bar) = @_;
+	if ($bar->{pipe_pending}) {
+		$bar->_append('|');
+		$bar->{pipe_pending} = 0;
+	}
+}
+
+sub space_left {
+	my ($bar) = @_;
+	$bar->{ncol} - $bar->{pipe_pending} - length $bar->{text};
+}
+
+sub add_button {
+	my ($bar, $text, $color_idx, $code) = @_;
+	$bar->_append_pending_pipe_maybe;
+	my $start = length $bar->{text};
+	$bar->_append($text, $bar->{parent}{rs_tab}[$color_idx]);
+	push @{ $bar->{buttons} }, [$start, length $bar->{text}, $code];
+	$bar->{pipe_pending} = 1;
+}
+
+sub add_title {
+	my ($bar, $text) = @_;
+	$bar->_append_pending_pipe_maybe;
+	$bar->_append($text, $bar->{parent}{rs_title});
+}
+
+sub apply {
+	my ($bar) = @_;
+	$bar->{pipe_pending} = 0;
+	$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}));
+	$bar->{parent}->ROW_t(0, $bar->{text}, 0, 0, $bar->{ncol});
+	$bar->{parent}->ROW_r(0, $bar->{rend}, 0, 0, $bar->{ncol});
 }
