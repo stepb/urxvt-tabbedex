@@ -841,8 +841,7 @@ sub tab_start {
 sub tab_destroy {
 	my ($self, $tab) = @_;
 
-	my $idx = 0;
-	++$idx while $self->{tabs}[$idx] != $tab;
+	my $idx = $tab->index;
 	splice @{ $self->{tabs} }, $idx, 1;
 
 	if (!@{ $self->{tabs} }) {
@@ -962,9 +961,7 @@ sub change_tab {
     my ($self, $tab, $direction) = @_;
 
     if (!$self->{is_inputting_name} && @{ $self->{tabs} } > 1) {
-        my $idx = 0;
-        ++$idx while $self->{tabs}[$idx] != $tab;
-        $idx += $direction;
+        my $idx = $tab->index + $direction;
         $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
     }
 
@@ -976,8 +973,7 @@ sub move_tab {
 
   if (@{ $self->{tabs} } > 1) {
     my $last = $#{$self->{tabs}};
-    my $idx = 0;
-    ++$idx while $self->{tabs}[$idx] != $tab;
+    my $idx = $tab->index;
 
     if ($idx == 0 && $direction == -1) {
       push @{$self->{tabs}}, shift @{$self->{tabs}};
@@ -1080,4 +1076,12 @@ package urxvt::ext::tabbedex::tab;
 sub tab_name {
     my ($tab, $idx, $max_len) = @_;
     return substr($tab->{name} || ($idx + 1), -$max_len);
+}
+
+sub index($) {
+	my $tab = shift;
+	my $parent = $tab->{term}{parent};
+	my $idx = 0;
+	++$idx while $parent->{tabs}[$idx] != $tab;
+	$idx;
 }
