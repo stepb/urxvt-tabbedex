@@ -468,7 +468,6 @@ sub _size_tabs_for_refresh {
 		$name
 	} 0..$#{ $self->{tabs} };
 
-	# All tabs fit with no truncation.  Short circuit the whole function.
 	my ($first, $last, $max) = (0, $#names);
 	if ($total > $ncol) {
 		if (@names > 3) {
@@ -476,7 +475,6 @@ sub _size_tabs_for_refresh {
 		}
 		$max = _best_max_width $ncol, \@names, $first, $last;
 	}
-
 	($first, $last, _tab_name_getter $max, \@names);
 }
 
@@ -517,18 +515,13 @@ sub refresh {
 		$bar->add_arrow(1);
 	}
 
-	if ($self->{tab_title} && $bar->space_left > 1) {
+	if ($self->{tab_title} && $bar->space_left) {
 		my $term = $self->{term};
 		my @str = $term->XGetWindowProperty(
 			$term->parent, $self->{tab_title});
 		if (@str && $str[2]) {
 			my $str = decode('utf8', $str[2]);
-			my $len = length $str;
-			my $available = $bar->space_left - 1;
-			if ($len > $available) {
-				substr($str, $available) = '';
-			}
-			$bar->add_title(' ' . $str);
+			$bar->add_title($self->{term}->special_encode($str));
 		}
 	}
 
@@ -1109,8 +1102,9 @@ sub rename_tab__key_press {
 		$tab->{term}{parent}->finish_rename_tab($tab, $is_enter);
 	} elsif (_is_backspace $event, $keysym) {
 		substr $tab->{name}, -2, 1, '';
-	} elsif ($octets !~ /[\x00-\x1f\x80-\xaf]/) {
-		substr $tab->{name}, -1, 0, $octets;
+	} elsif ($octets !~ /[\x00-\x1f]/) {
+		my $text = $tab->{term}->locale_decode($octets);
+		substr $tab->{name}, -1, 0, $tab->{term}->special_encode($text);
 	} else {
 		return 1;
 	}
@@ -1154,10 +1148,12 @@ sub tab_osc_seq_perl {
 	my ($self, $tab, $osc) = @_;
 
 	if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
+		my $name = $self->{term}->locale_decode($1);
+		$name = $self->{term}->special_encode($name);
 		if (exists $tab->{old_name}) {
-			$tab->{old_name} = $1;
+			$tab->{old_name} = $name;
 		} else {
-			$tab->{name} = $1;
+			$tab->{name} = $name;
 			$self->update_autohide (1);
 			$self->refresh;
 		}
@@ -1237,8 +1233,22 @@ sub add_button {
 
 sub add_title {
 	my ($bar, $text) = @_;
+	my $parent = $bar->{parent};
+
+	my $available = $bar->space_left;
+	if (!$available) {
+		return;
+	}
+
 	$bar->_append_pending_pipe_maybe;
-	$bar->_append($text, $bar->{parent}{rs_title});
+	if (length $text < $available) {
+		$text = ' ' . $text;
+	} elsif ($available == 1) {
+		$text = substr $text, 0, 1;
+	} else {
+		$text = (substr $text, 0, $available - 1) . '…';
+	}
+	$bar->_append($text, $parent->{rs_title});
 }
 
 sub add_arrow {
