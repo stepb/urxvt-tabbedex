@@ -489,7 +489,11 @@ sub refresh {
 	my $bar = new urxvt::ext::tabbedex::tabbar($self);
 
 	if ($self->{new_button}) {
-		$bar->add_button('[NEW]', 1, -1);
+		my $str = '[NEW]';
+		if ($self->ncol <= 60) {
+			$str = $self->ncol <= 30 ? '+' : 'NEW';
+		}
+		$bar->add_button($str, 1, -1);
 	}
 
 	my ($idx, $last, $get_name) = $self->_size_tabs_for_refresh(
