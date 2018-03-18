@@ -841,6 +841,11 @@ sub tab_start {
 sub tab_destroy {
 	my ($self, $tab) = @_;
 
+	# If the tab is being renamed, stop renaming first.
+	if (exists $tab->{old_name}) {
+		$self->finish_rename_tab($tab, 0);
+	}
+
 	my $idx = $tab->index;
 	splice @{ $self->{tabs} }, $idx, 1;
 
@@ -939,7 +944,7 @@ sub tab_user_command {
     }
   }
   elsif ($cmd eq 'tabbedex:rename_tab') {
-    $self->rename_tab($tab);
+    $self->start_rename_tab($tab);
   }
   elsif ($cmd eq 'tabbedex:kill_tab') {
     $tab->destroy;
@@ -1020,15 +1025,7 @@ sub rename_tab__key_press {
 
 	my $is_enter = $keysym == 0xff0d || $keysym == 0xff8d;
 	if ($is_enter || _is_escape $event, $keysym) {
-		if ($is_enter) {
-			substr $tab->{name}, -1, 1, '';
-		} else {
-			$tab->{name} = $tab->{old_name};
-		}
-		delete $tab->{old_name};
-		$tab->{term}{parent}->{is_inputting_name} = 0;
-		$tab->{term}{parent}->update_autohide (1);
-		$tab->disable('key_press');
+		$tab->{term}{parent}->finish_rename_tab($tab, $is_enter);
 	} elsif (_is_backspace $event, $keysym) {
 		substr $tab->{name}, -2, 1, '';
 	} elsif ($octets !~ /[\x00-\x1f\x80-\xaf]/) {
@@ -1041,7 +1038,7 @@ sub rename_tab__key_press {
 	1;
 }
 
-sub rename_tab {
+sub start_rename_tab {
 	my ($self, $tab) = @_;
 	if ($self->{is_inputting_name}) {
 		return;
@@ -1055,6 +1052,22 @@ sub rename_tab {
 	$tab->enable('key_press', \&rename_tab__key_press);
 }
 
+sub finish_rename_tab {
+	my ($self, $tab, $accept) = (@_, 1);
+	if (!exists $tab->{old_name} || !$self->{is_inputting_name}) {
+		warn "finish_rename_tab called on tab which is being renamed\n";
+		return;
+	}
+	if ($accept) {
+		substr $tab->{name}, -1, 1, '';
+	} else {
+		$tab->{name} = $tab->{old_name};
+	}
+	delete $tab->{old_name};
+	$self->{is_inputting_name} = 0;
+	$self->update_autohide (1);
+	$tab->disable('key_press');
+}
 
 sub tab_osc_seq_perl {
 	my ($self, $tab, $osc) = @_;
