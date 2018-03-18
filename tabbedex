@@ -1171,18 +1171,16 @@ package urxvt::ext::tabbedex::tab;
 # helper extension implementing the subwindows of a tabbed terminal.
 # simply proxies all interesting calls back to the tabbedex class.
 
-{
-   for my $hook ( qw(start destroy user_command property_notify
-                     add_lines bell osc_seq_perl) ) {
-      eval qq{
-         sub on_$hook {
-            my \$parent = \$_[0]{term}{parent}
-               or return;
-            \$parent->tab_$hook (\@_)
-         }
-      };
-      die if $@;
-   }
+for (qw(start destroy user_command property_notify add_lines bell
+        osc_seq_perl)) {
+	eval qq{
+		sub on_$_ {
+			my \$parent = \$_[0]{term}{parent} or return;
+			unshift \@_, \$parent;
+			goto \\&urxvt::ext::tabbedex::tab_$_;
+		}
+	};
+	die if $@;
 }
 
 sub index($) {
