@@ -1057,18 +1057,18 @@ sub rename_tab {
 
 
 sub tab_osc_seq_perl {
-    my ($self, $tab, $osc) = @_;
+	my ($self, $tab, $osc) = @_;
 
-    if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
-        if ($self->{is_inputting_name}) {
-            $tab->{old_name} = $1;
-        } else {
-            $tab->{name} = $1;
-        }
-        $self->update_autohide (1);
-        $self->refresh;
-        1;
-    }
+	if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
+		if (exists $tab->{old_name}) {
+			$tab->{old_name} = $1;
+		} else {
+			$tab->{name} = $1;
+			$self->update_autohide (1);
+			$self->refresh;
+		}
+		1;
+	}
 }
 
 
