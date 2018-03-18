@@ -383,12 +383,26 @@ sub _tabbar_span {
 		$keep_going = !$i || $self->{tabs}[$i - 1] != $self->{cur};
 	}
 
+	if ($i < @$names) {
+		--$ncol;  # Reserve character for right arrow.
+	}
+
 	my $first = 0;
-	while ($ncol < 0) {
-		$ncol += $len->($first++);
+	if ($ncol < 0) {
+		# If NEW button is not shown, reserve characte for left arrow.
+		$ncol += $len->($first++) - !$self->{new_button};
+		while ($ncol < 0) {
+			$ncol += $len->($first++);
+		}
 	}
 
 	while ($i < @$names && ($ncol -= $len->($i)) >= 0) {
+		++$i;
+	}
+
+	if ($i == $#$names && $ncol == -1) {
+		# If we’re left with only the last tab and we’re missing one
+		# character, we can use the space we reserved for right arrow.
 		++$i;
 	}
 
@@ -481,6 +495,10 @@ sub refresh {
 	my ($idx, $last, $get_name) = $self->_size_tabs_for_refresh(
 		$bar->space_left);
 
+	if ($idx) {
+		$bar->add_arrow(-1);
+	}
+
 	for (my $now = int urxvt::NOW; $idx <= $last; ++$idx) {
 		my $name = $get_name->($idx);
 		my $tab = $self->{tabs}[$idx];
@@ -489,6 +507,10 @@ sub refresh {
 		my $act = $self->tab_activity_mark($tab, $now);
 		$name = $act . $name . matching_activity_mark($act);
 		$bar->add_button($name, $color_idx, $idx);
+	}
+
+	if ($idx < @{ $self->{tabs} }) {
+		$bar->add_arrow(1);
 	}
 
 	if ($self->{tab_title} && $bar->space_left > 1) {
@@ -1215,6 +1237,12 @@ sub add_title {
 	my ($bar, $text) = @_;
 	$bar->_append_pending_pipe_maybe;
 	$bar->_append($text, $bar->{parent}{rs_title});
+}
+
+sub add_arrow {
+	my ($bar, $direction) = @_;
+	$bar->_append($direction < 0 ? '←' : '→');
+	$bar->{pipe_pending} = 0;
 }
 
 sub apply {
