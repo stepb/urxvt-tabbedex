@@ -307,7 +307,7 @@ sub update_autohide {
    my $oldh = $self->{tabheight};
    if (!$self->{autohide} ||
        @{ $self->{tabs} } > 1 ||
-       $self->{is_inputting_name}) {
+       $self->{cur}->is_being_renamed) {
       $self->{tabheight} = $self->{maxtabheight};
     } else {
       $self->{tabheight} = 0;
@@ -730,7 +730,7 @@ sub key_event {
 sub on_button_release {
 	my ($self, $event) = @_;
 
-	if ($self->{is_inputting_name} || $event->{row} != 0) {
+	if ($self->{cur}->is_being_renamed || $event->{row} != 0) {
 		return ();
 	}
 
@@ -917,8 +917,8 @@ sub tab_destroy {
 	my ($self, $tab) = @_;
 
 	# If the tab is being renamed, stop renaming first.
-	if (exists $tab->{old_name}) {
-		$self->finish_rename_tab($tab, 0);
+	if ($tab->is_being_renamed) {
+		$tab->finish_rename_tab(0);
 	}
 
 	my $idx = $tab->index;
@@ -994,7 +994,7 @@ sub tab_user_command {
   my ($self, $tab, $cmd, $proxy_events) = @_;
 
   if ($cmd eq 'tabbedex:new_tab') {
-    if (!$self->{is_inputting_name}) {
+    if (!$self->{cur}->is_being_renamed) {
       $self->new_tab;
     }
   }
@@ -1011,7 +1011,7 @@ sub tab_user_command {
     $self->move_tab($tab, 1);
   }
   elsif ($cmd =~ /^tabbedex:goto_tab_(-?\d+)$/) {
-    if ($1 != 0 && !$self->{is_inputting_name} && @{ $self->{tabs} } > 1) {
+    if ($1 != 0 && !$self->{cur}->is_being_renamed && @{ $self->{tabs} } > 1) {
       my $idx = $1 > 0 ? ($1 - 1) : (@{ $self->{tabs} } + $1);
       if ($idx >= 0 && $idx < @{ $self->{tabs} }) {
         $self->make_current ($self->{tabs}[$idx]);
@@ -1019,7 +1019,10 @@ sub tab_user_command {
     }
   }
   elsif ($cmd eq 'tabbedex:rename_tab') {
-    $self->start_rename_tab($tab);
+    if ($tab == $self->{cur} && $tab->start_rename_tab) {
+      $self->update_autohide(1);
+      $self->refresh;
+    }
   }
   elsif ($cmd eq 'tabbedex:kill_tab') {
     $tab->destroy;
@@ -1040,7 +1043,7 @@ sub tab_user_command {
 sub change_tab {
     my ($self, $tab, $direction) = @_;
 
-    if (!$self->{is_inputting_name} && @{ $self->{tabs} } > 1) {
+    if (!$self->{cur}->is_being_renamed && @{ $self->{tabs} } > 1) {
         my $idx = $tab->index + $direction;
         $self->make_current ($self->{tabs}[$idx % @{ $self->{tabs}}]);
     }
@@ -1072,89 +1075,13 @@ sub move_tab {
 }
 
 
-sub _is_escape($$) {
-	my ($event, $keysym) = @_;
-	return 1 if $keysym == 0xff1b;  # Escape
-	return 0 unless $event->{state} & urxvt::ControlMask;
-	$keysym == 99 || $keysym == 67;  # Ctrl+C
-}
-
-sub _is_backspace($$) {
-	my ($event, $keysym) = @_;
-	return 1 if $keysym == 0xff08;  # Backspace
-	return 0 unless $event->{state} & urxvt::ControlMask;
-	$keysym == 104 || $keysym == 72;  # Ctrl+H
-}
-
-sub rename_tab__key_press {
-	my ($tab, $event, $keysym, $octets) = @_;
-
-	# rxvt-unicode-scroll-bug-fix.patch causes early key_press events to be
-	# passed without $keysym or $octects arguments passed.  Work around it
-	# by ignoring such invocations; we’ll be called again soon with all
-	# those arguments.  The patch shouldn’t be used any more anyway.
-	if (!defined $keysym) {
-		return 0;
-	}
-
-	my $is_enter = $keysym == 0xff0d || $keysym == 0xff8d;
-	if ($is_enter || _is_escape $event, $keysym) {
-		$tab->{term}{parent}->finish_rename_tab($tab, $is_enter);
-	} elsif (_is_backspace $event, $keysym) {
-		substr $tab->{name}, -2, 1, '';
-	} elsif ($octets !~ /[\x00-\x1f]/) {
-		my $text = $tab->{term}->locale_decode($octets);
-		substr $tab->{name}, -1, 0, $tab->{term}->special_encode($text);
-	} else {
-		return 1;
-	}
-
-	$tab->{term}{parent}->refresh;
-	1;
-}
-
-sub start_rename_tab {
-	my ($self, $tab) = @_;
-	if ($self->{is_inputting_name}) {
-		return;
-	}
-
-	$self->{is_inputting_name} = 1;
-	$tab->{old_name} = $tab->{name} || "";
-	$tab->{name} = "█";
-	$self->update_autohide (1);
-	$self->refresh;
-	$tab->enable('key_press', \&rename_tab__key_press);
-}
-
-sub finish_rename_tab {
-	my ($self, $tab, $accept) = (@_, 1);
-	if (!exists $tab->{old_name} || !$self->{is_inputting_name}) {
-		warn "finish_rename_tab called on tab which is being renamed\n";
-		return;
-	}
-	if ($accept) {
-		substr $tab->{name}, -1, 1, '';
-	} else {
-		$tab->{name} = $tab->{old_name};
-	}
-	delete $tab->{old_name};
-	$self->{is_inputting_name} = 0;
-	$self->update_autohide (1);
-	$tab->disable('key_press');
-}
-
 sub tab_osc_seq_perl {
 	my ($self, $tab, $osc) = @_;
 
 	if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
 		my $name = $self->{term}->locale_decode($1);
-		$name = $self->{term}->special_encode($name);
-		if (exists $tab->{old_name}) {
-			$tab->{old_name} = $name;
-		} else {
-			$tab->{name} = $name;
-			$self->update_autohide (1);
+		if ($tab->set_name($self->{term}->special_encode($name))) {
+			$self->update_autohide(1);
 			$self->refresh;
 		}
 		1;
@@ -1179,6 +1106,7 @@ for (qw(start destroy user_command property_notify add_lines bell
 	die if $@;
 }
 
+
 sub index($) {
 	my $tab = shift;
 	my $parent = $tab->{term}{parent};
@@ -1188,6 +1116,92 @@ sub index($) {
 }
 
 
+sub start_rename_tab {
+	my ($tab) = @_;
+	if ($tab->is_being_renamed) {
+		return 0;
+	}
+	$tab->{old_name} = $tab->{name} || "";
+	$tab->{name} = "█";
+	$tab->enable('key_press', \&_rename_tab_key_press);
+	1
+}
+
+sub finish_rename_tab {
+	my ($tab, $accept) = @_;
+	if (!$tab->is_being_renamed) {
+		urxvt::warn('finish_rename_tab called on tab which is not ' .
+			    "being renamed\n");
+		return;
+	}
+	if ($accept) {
+		substr $tab->{name}, -1, 1, '';
+	} else {
+		$tab->{name} = $tab->{old_name};
+	}
+	delete $tab->{old_name};
+	$tab->disable('key_press');
+
+	$tab->{term}{parent}->update_autohide(1);
+	$tab->{term}{parent}->refresh;
+}
+
+sub set_name {
+	my ($tab, $name) = @_;
+	if ($tab->is_being_renamed) {
+		$tab->{old_name} = $name;
+		0
+	} else {
+		$tab->{name} = $name;
+		1
+	}
+}
+
+sub is_being_renamed { exists $_[0]{old_name} }
+
+sub _is_escape($$) {
+	my ($event, $keysym) = @_;
+	return 1 if $keysym == 0xff1b;  # Escape
+	return 0 unless $event->{state} & urxvt::ControlMask;
+	$keysym == 99 || $keysym == 67;  # Ctrl+C
+}
+
+sub _is_backspace($$) {
+	my ($event, $keysym) = @_;
+	return 1 if $keysym == 0xff08;  # Backspace
+	return 0 unless $event->{state} & urxvt::ControlMask;
+	$keysym == 104 || $keysym == 72;  # Ctrl+H
+}
+
+sub _rename_tab_key_press {
+	my ($tab, $event, $keysym, $octets) = @_;
+
+	# rxvt-unicode-scroll-bug-fix.patch causes early key_press events to be
+	# passed without $keysym or $octects arguments passed.  Work around it
+	# by ignoring such invocations; we’ll be called again soon with all
+	# those arguments.  The patch shouldn’t be used any more anyway.
+	if (!defined $keysym) {
+		return 0;
+	}
+
+	my $is_enter = $keysym == 0xff0d || $keysym == 0xff8d;
+	if ($is_enter || _is_escape $event, $keysym) {
+		$tab->finish_rename_tab($is_enter);
+	} elsif (_is_backspace $event, $keysym) {
+		substr $tab->{name}, -2, 1, '';
+	} elsif ($octets !~ /[\x00-\x1f]/) {
+		my $text = $tab->{term}->locale_decode($octets);
+		substr $tab->{name}, -1, 0, $tab->{term}->special_encode($text);
+	} else {
+		return 1;
+	}
+
+	$tab->{term}{parent}->refresh;
+	1;
+}
+
+
+## Class for building up the tabbar.
 package urxvt::ext::tabbedex::tabbar;
 
 sub new {
