@@ -786,13 +786,12 @@ sub on_init {
       $self->{option}{$key} = $self->{term}->option($key, 0);
    }
 
-   $self->{rs_tabbar} = $self->rs_color ('tabbar', 3, 0);
-   $self->{rs_title}  = $self->rs_color ('title', 2, 0);
-   $self->{rs_tab}    = [
-      undef,                              # inactive
+   $self->{rs_colours} = [
+      $self->rs_color ('tabbar', 3, 0),   # inactive
       $self->rs_color ('tab', 0, 1),      # active
       $self->rs_color ('bell', 0, 3),     # bell ringing
-      $self->rs_color ('bell-tab', 5, 4)  # active, bell ringing
+      $self->rs_color ('bell-tab', 5, 4), # active, bell ringing
+      $self->rs_color ('title', 2, 0)
    ];
 
    my $timeouts = $self->rs_text('tabbar-timeouts',
@@ -1214,13 +1213,14 @@ sub new {
 		ncol => $parent->ncol,
 		buttons => $parent->{tabofs},
 		pipe_pending => 0,
+		pad_colour => 0,
 	}, $class;
 }
 
 sub _append {
 	my ($bar, $text, $c) = @_;
 	$bar->{text} .= $text;
-	push @{$bar->{rend}}, ($c // $bar->{parent}{rs_tabbar}) x length $text;
+	push @{$bar->{rend}}, ($bar->{parent}{rs_colours}[$c]) x length $text;
 }
 
 sub _append_pending_pipe_maybe {
@@ -1240,14 +1240,13 @@ sub add_button {
 	my ($bar, $text, $color_idx, $code) = @_;
 	$bar->_append_pending_pipe_maybe;
 	my $start = length $bar->{text};
-	$bar->_append($text, $bar->{parent}{rs_tab}[$color_idx]);
+	$bar->_append($text, $color_idx);
 	push @{ $bar->{buttons} }, [$start, length $bar->{text}, $code];
 	$bar->{pipe_pending} = 1;
 }
 
 sub add_title {
 	my ($bar, $text) = @_;
-	my $parent = $bar->{parent};
 
 	my $available = $bar->space_left;
 	if (!$available) {
@@ -1262,7 +1261,8 @@ sub add_title {
 	} else {
 		$text = (substr $text, 0, $available - 1) . '…';
 	}
-	$bar->_append($text, $parent->{rs_title});
+	$bar->_append($text, 4);
+	$bar->{pad_colour} = 4;
 }
 
 sub add_arrow {
@@ -1280,7 +1280,8 @@ sub apply {
 	my ($bar) = @_;
 	my $parent = $bar->{parent};
 	$bar->{pipe_pending} = 0;
-	$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}));
+	$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}),
+	              $bar->{pad_colour});
 	my $cur = $bar->{cursor};
 	$bar->{parent}->cmd_parse(
 		defined($cur) ? "\e[1;${cur}f\e[?25h" : "\e[?25l");
