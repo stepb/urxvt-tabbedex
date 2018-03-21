@@ -509,6 +509,9 @@ sub refresh {
 		my $act = $self->tab_activity_mark($tab, $now);
 		$name = $act . $name . matching_activity_mark($act);
 		$bar->add_button($name, $color_idx, $idx);
+		if ($tab->is_being_renamed) {
+			$bar->put_cursor(-2);
+		}
 	}
 
 	if ($idx < @{ $self->{tabs} }) {
@@ -1121,8 +1124,8 @@ sub start_rename_tab {
 	if ($tab->is_being_renamed) {
 		return 0;
 	}
-	$tab->{old_name} = $tab->{name} || "";
-	$tab->{name} = "█";
+	$tab->{old_name} = $tab->{name};
+	$tab->{name} = ' ';
 	$tab->enable('key_press', \&_rename_tab_key_press);
 	1
 }
@@ -1271,10 +1274,19 @@ sub add_arrow {
 	$bar->{pipe_pending} = 0;
 }
 
+sub put_cursor {
+	my ($bar, $dx) = @_;
+	$bar->{cursor} = length($bar->{text}) + $dx + 1;
+}
+
 sub apply {
 	my ($bar) = @_;
+	my $parent = $bar->{parent};
 	$bar->{pipe_pending} = 0;
 	$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}));
+	my $cur = $bar->{cursor};
+	$bar->{parent}->cmd_parse(
+		defined($cur) ? "\e[1;${cur}f\e[?25h" : "\e[?25l");
 	$bar->{parent}->ROW_t(0, $bar->{text}, 0, 0, $bar->{ncol});
 	$bar->{parent}->ROW_r(0, $bar->{rend}, 0, 0, $bar->{ncol});
 }
