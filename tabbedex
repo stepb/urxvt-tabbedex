@@ -553,9 +553,10 @@ sub new_tab {
             if defined $value;
       }
 
-      foreach my $opt (keys %urxvt::OPTION) {
-          my $value = $self->{option}{$opt};
-          $term->option($urxvt::OPTION{$opt}, $value);
+      foreach my $key (values %urxvt::OPTION) {
+         my $val = exists $self->{option}{$key}
+           ? $self->{option}{$key} : $self->{term}->option($key);
+         $term->option($key, $val);
       }
 
       $term->resource (perl_ext_2 =>
@@ -781,13 +782,9 @@ sub on_init {
    $self->{rs_prefix} = 'tabbed';
    $self->{rs_prefix} = $self->rs_text ('tabbedex-rs-prefix', 'tabbed');
 
-   $self->{option} = {};
-   for my $key (keys %urxvt::OPTION) {
-       $self->{option}{$key} = $self->option($urxvt::OPTION{$key});
+   if (defined(my $key = $urxvt::OPTION{scrollBar})) {
+      $self->{option}{$key} = $self->{term}->option($key, 0);
    }
-
-   # this is for the tabs terminal; order is important
-   $self->option ($urxvt::OPTION{scrollBar}, 0);
 
    $self->{rs_tabbar} = $self->rs_color ('tabbar', 3, 0);
    $self->{rs_title}  = $self->rs_color ('title', 2, 0);
