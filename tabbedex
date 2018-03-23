@@ -305,22 +305,6 @@ Sets name of the current tab to I<name>.
 
 use Encode qw(decode);
 
-sub update_autohide {
-   my ($self, $reconfigure) = @_;
-   my $oldh = $self->{tabheight};
-   if (!$self->{autohide} ||
-       @{ $self->{tabs} } > 1 ||
-       $self->{cur}->is_being_renamed) {
-      $self->{tabheight} = $self->{maxtabheight};
-    } else {
-      $self->{tabheight} = 0;
-   }
-   if ($reconfigure && $self->{tabheight} != $oldh) {
-      $self->configure;
-      $self->copy_properties;
-   }
-}
-
 
 sub tab_bell_active ($$$) {
     my ($self, $tab, $now) = @_;
@@ -484,8 +468,17 @@ sub _size_tabs_for_refresh {
 sub refresh {
 	my ($self) = @_;
 
-	# autohide makes it zero
-	return unless $self->{tabheight};
+	my $visible = (!$self->{autohide} ||
+	               @{ $self->{tabs} } > 1 ||
+	               $self->{cur}->is_being_renamed);
+	if ($visible != !!$self->{tabheight}) {
+		$self->{tabheight} = $visible * $self->{maxtabheight};
+		$self->configure;
+		$self->copy_properties;
+	}
+	if (!$visible) {
+		return;
+	}
 
 	my $bar = new urxvt::ext::tabbedex::tabbar($self);
 
@@ -538,11 +531,6 @@ sub refresh {
 
 sub new_tab {
    my ($self) = @_;
-
-   unless ($self->{autohide} &&
-           !(defined $self->{tabs} && @{ $self->{tabs} })) {
-      $self->{tabheight} = $self->{maxtabheight}
-   }
 
    # save a backlink to us, make sure tabbedex is inactive
    push @urxvt::TERM_INIT, sub {
@@ -730,7 +718,8 @@ sub key_event {
 sub on_button_release {
 	my ($self, $event) = @_;
 
-	if ($self->{cur}->is_being_renamed || $event->{row} != 0) {
+	if ($self->{cur}->is_being_renamed || $event->{row} != 0 ||
+	   $event->{button} != 1) {
 		return ();
 	}
 
@@ -973,8 +962,6 @@ sub tab_destroy {
 		$self->new_tab;
 	}
 
-	$self->update_autohide;
-
 	if ($self->{cur} == $tab) {
 		delete $self->{cur};
 		$idx = $idx < @{ $self->{tabs} } ? $idx : -1;
@@ -1058,7 +1045,6 @@ sub tab_user_command {
   }
   elsif ($cmd eq 'tabbedex:rename_tab') {
     if ($tab == $self->{cur} && $tab->start_rename_tab) {
-      $self->update_autohide(1);
       $self->refresh;
     }
   }
@@ -1119,7 +1105,6 @@ sub tab_osc_seq_perl {
 	if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
 		my $name = $self->{term}->locale_decode($1);
 		if ($tab->set_name($self->{term}->special_encode($name))) {
-			$self->update_autohide(1);
 			$self->refresh;
 		}
 		1;
@@ -1180,7 +1165,6 @@ sub finish_rename_tab {
 	delete $tab->{old_name};
 	$tab->disable('key_press');
 
-	$tab->{term}{parent}->update_autohide(1);
 	$tab->{term}{parent}->refresh;
 }
 
