@@ -81,23 +81,23 @@ If set (the default), the tab bar will be hidden unless there are at least two
 tabs open.  This is irrespective of whether C<NEW> button or tab's title is
 displayed.
 
-=item B<bell-fg>: I<colour index>
+=item B<bell-fg>: I<colour>
 
-=item B<bell-bg>: I<colour index>
+=item B<bell-bg>: I<colour>
 
 Foreground and background colours of an inactive tab on which bell has rung.
 (0, 3) by default which translates to black on brown/dark yellow (i.e. inverse
-of the default tab bar colours).  See I<COLOUR AND GRAPHICS> in the L<urxvt(1)>
-manpage for valid indices.
+of the default tab bar colours).  See B<tabbar-fg> for more documentation on how
+colours can be specified.
 
-=item B<bell-tab-fg>: I<colour index>
+=item B<bell-tab-fg>: I<colour>
 
-=item B<bell-tab-bg>: I<colour index>
+=item B<bell-tab-bg>: I<colour>
 
 Foreground and background colours of a active tab in which bell is ringing.  (5,
-4) by default which translates to magenta an blue.  See I<COLOUR AND GRAPHICS>
-in the L<urxvt(1)> manpage for valid indices.  The bell is said to be ringing on
-an active tab for B<bell-timeout> seconds after it started, see B<bell-timeout>.
+4) by default which translates to magenta an blue.  See B<tabbar-fg> for more
+documentation on how colours can be specified.  The bell is said to be ringing
+on an active tab for B<bell-timeout> seconds after it started.
 
 =item B<bell-timeout>: I<integer>
 
@@ -171,21 +171,24 @@ terminals (tabs).  tabbedex plugin is implicitly added onto the list.
 
 If set, whenever last tab is destroyed a new one will be created.
 
-=item B<tabbar-fg>: I<color index>
+=item B<tabbar-fg>: I<colour>
 
-=item B<tabbar-bg>: I<color index>
+=item B<tabbar-bg>: I<colour>
 
 Foreground and background colours of the tab bar.  (3, 0) by default which
-translates to brown/dark yellow on black background.  See I<COLOUR AND GRAPHICS>
-in the L<urxvt(1)> manpage for valid indices.
+translates to brown/dark yellow on black background.
 
-=item B<tab-fg>: I<color index>
+Colours can be specified as: I<-2> meaning default foreground, I<-1> meaning
+default background, an integer between B<0> and B<255> specifying index in
+terminal' colour palette or any other string which X11 recognises as a colour.
 
-=item B<tab-bg>: I<color index>
+=item B<tab-fg>: I<colour>
+
+=item B<tab-bg>: I<colour>
 
 Foreground and background colours of the current tab on the tab bar.  (0, 1) by
-default which translates to black on red.  See I<COLOUR AND GRAPHICS> in the
-L<urxvt(1)> manpage for valid indices.
+default which translates to black on red.  See B<tabbar-fg> for more
+documentation on how colours can be specified.
 
 =item B<tabbar-timeouts>: I<string>
 
@@ -226,13 +229,13 @@ always read from C<URxvt.tabbed.tabbedex-rs-prefix>.
 If set (the default), when tab bar is visible and there is enough space left,
 current tab's title will be displayed after the last tab.
 
-=item B<title-fg>: I<color inde>
+=item B<title-fg>: I<colour>
 
-=item B<title-bg>: I<color inde>
+=item B<title-bg>: I<colour>
 
 Foreground and background colours of the tab title.  (2, 0) by default which
-translates to green on black.  Only used when B<title> is true.  See I<COLOUR
-AND GRAPHICS> in the L<urxvt(1)> manpage for valid indices.
+translates to green on black.  See B<tabbar-fg> for more documentation on how
+colours can be specified.
 
 =back
 
@@ -643,13 +646,6 @@ sub rs_bool {
     defined $val ? $val !~ /^(?:false|0|no)$/i : $default;
 }
 
-sub rs_color($$$$) {
-    my ($self, $prefix, $def_fg, $def_bg) = @_;
-    my $fg = $self->rs_text ($prefix . '-fg') // $def_fg;
-    my $bg = $self->rs_text ($prefix . '-bg') // $def_bg;
-    urxvt::SET_COLOR (urxvt::DEFAULT_RSTYLE, $fg + 2, $bg + 2);
-}
-
 
 sub make_current {
 	my ($self, $tab) = @_;
@@ -786,14 +782,6 @@ sub on_init {
       $self->{option}{$key} = $self->{term}->option($key, 0);
    }
 
-   $self->{rs_colours} = [
-      $self->rs_color ('tabbar', 3, 0),   # inactive
-      $self->rs_color ('tab', 0, 1),      # active
-      $self->rs_color ('bell', 0, 3),     # bell ringing
-      $self->rs_color ('bell-tab', 5, 4), # active, bell ringing
-      $self->rs_color ('title', 2, 0)
-   ];
-
    my $timeouts = $self->rs_text('tabbar-timeouts',
                                  '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█');
    if ($timeouts) {
@@ -828,9 +816,60 @@ sub on_init {
    ();
 }
 
+sub rs_read_colours {
+	my ($self) = @_;
+
+	my %used;
+	my $rs_colour = sub {
+		my $val = $self->rs_text($_[0]) // $_[1];
+		$val =~ s/\s+/ /g;
+		$val =~ s/^ | $//g;
+		if ($val !~ /^[-#a-zA-Z0-9 ]/) {
+			$val = $_[1];
+		}
+		$used{$val} = undef;
+		$val
+	};
+
+	my @colours = (['tabbar', 3, 0],
+	               ['tab', 0, 1],
+	               ['bell', 0, 3],
+	               ['bell-tab', 5, 4],
+	               ['title', 2, 0]);
+
+	for my $c (@colours) {
+		my $prefix = shift @$c;
+		$c->[0] = $rs_colour->($prefix . '-fg', $c->[0]);
+		$c->[1] = $rs_colour->($prefix . '-bg', $c->[1]);
+	}
+
+	my ($i, $cmd) = (0, '');
+	for my $key (keys %used) {
+		if ($key =~ /^-?\d+$/ && -2 <= $key && $key <= 255) {
+			$used{$key} = $key + 2;
+		} else {
+			++$i while exists $used{$i};
+			$cmd .= ';' . $i . ';' . $key;
+			$used{$key} = $used{$i} = $i + 2;
+		}
+	}
+
+	if ($cmd) {
+		$self->cmd_parse("\e]4$cmd\a");
+	}
+
+	my $def = urxvt::DEFAULT_RSTYLE;
+	for $i (0..$#colours) {
+		my ($fg, $bg) = @{ $colours[$i] };
+		$colours[$i] = urxvt::SET_COLOR $def, $used{$fg}, $used{$bg};
+	}
+	\@colours
+}
 
 sub on_start {
    my ($self) = @_;
+
+   $self->{rs_colours} = $self->rs_read_colours;
 
    $self->{maxtabheight} =
       $self->int_bwidth + $self->fheight + $self->lineSpace;
