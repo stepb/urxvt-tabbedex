@@ -860,8 +860,6 @@ sub on_start {
       $root->int_bwidth + $root->fheight + $root->lineSpace;
    $root->{tabheight} = $root->{autohide} ? 0 : $root->{maxtabheight};
 
-   $root->{running_user_command} = 0;
-
    $root->cmd_parse ("\033[?25l");
 
    my @argv = $root->argv;
@@ -907,12 +905,6 @@ sub on_configure_notify {
    $root->refresh;
 
    ();
-}
-
-
-sub on_user_command {
-    my $root = shift;
-    $root->tab_user_command($root->{cur}, @_);
 }
 
 
@@ -1015,8 +1007,14 @@ sub tab_add_lines {
 }
 
 
+sub on_user_command {
+	my $root = shift;
+	unshift @_, $root, $root->{cur}, @_;
+	goto \&tab_user_command;
+}
+
 sub tab_user_command {
-  my ($root, $tab, $cmd, $proxy_events) = @_;
+  my ($root, $tab, $cmd) = @_;
 
   if ($cmd eq 'tabbedex:new_tab') {
     if (!$root->{cur}->is_being_renamed) {
@@ -1050,15 +1048,6 @@ sub tab_user_command {
   }
   elsif ($cmd eq 'tabbedex:kill_tab') {
     $tab->destroy;
-  }
-  else {
-    # Proxy the user command through to the tab's term, while taking care not
-    # to get caught in an infinite loop.
-    if ($proxy_events && $root->{running_user_command} == 0) {
-      $root->{running_user_command} = 1;
-      urxvt::invoke($tab->{term}, 20, $cmd);
-      $root->{running_user_command} = 0;
-    }
   }
 
   ();
