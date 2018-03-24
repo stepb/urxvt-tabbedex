@@ -791,10 +791,6 @@ sub on_init {
    $root->{autohide} = $root->rs_bool ('autohide', 1);
    $root->{no_default_keys} = $root->rs_bool ('no-tabbedex-keys', 0);
    $root->{reopen_on_close} = $root->rs_bool ('reopen-on-close', 0);
-   $root->{tab_urgent_on_bell} =
-     $root->x_resource_boolean ('urgentOnBell') // 0;
-   $root->{map_on_bell} =
-     $root->x_resource_boolean ('mapAlert') // 0;
    $root->{new_tab_command} = $root->rs_text ('new-tab-command', 'inherit');
 
    $root->register_keysyms;
@@ -990,15 +986,19 @@ sub tab_bell {
 	my $bell = $root->tab_bell_active($tab, $now);
 	$tab->{bell_rung} = $now;
 	if ($tab != $root->{cur}) {
-		if ($root->{map_on_bell}) {
-			$root->make_current($tab);
-			undef $bell;
-		}
-		if ($root->{tab_urgent_on_bell}) {
+		my ($map, $urgent) = map {
+			my $key = $urxvt::OPTION{$_};
+			defined $key ? $tab->option($key) : 0
+		} qw/mapAlert urgentOnBell/;
+		if ($urgent) {
 			$root->{term}->set_urgency(1);
 		}
+		if ($map) {
+			$root->make_current($tab);
+			return;
+		}
 	}
-	if (defined $bell && $bell ne $root->tab_bell_active($tab, $now)) {
+	if ($bell ne $root->tab_bell_active($tab, $now)) {
 		$root->refresh;
 	}
 	();
