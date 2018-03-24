@@ -69,9 +69,33 @@ Return to confirm or Escape to cancel.
 
 =head1 CONFIGURATION
 
-The extension can be configured similarly to a normal terminal.  By default, it
-uses a resource class of C<URxvt.tabbed> which is the same as the tabbed
-extension.
+The extension can be configured via X resources just like urxvt itself or other
+plugins.  The default, deprecated, behaviour is for tabbedex to use C<tabbed> as
+a resource name prefix, for example:
+
+    URxvt.tabbed.tabbar-fg: 4
+    URxvt.tabbed.tabbar-bg: 0
+
+This can be configured using a C<tabbedex-rs-prefix> resource, for example:
+
+    ! Percent sign means name of the current plugin.
+    URxvt.tabbed.tabbedex-rs-prefix: %
+
+    ! Affects tabbed plugin only:
+    URxvt.tabbed.tabbar-fg: 4
+    URxvt.tabbed.tabbar-bg: 0
+
+    ! Affects tabbedex plugin only:
+    URxvt.tabbedex.tabbar-fg: 5
+    URxvt.tabbedex.tabbar-bg: 0
+
+However, future versions of the extensions will stop respecting the resource all
+together and will unconditionally use plugin name as the prefix.  This will
+bring it in line with how other urxvt perl extensions behave.
+
+To avoid breakage, users should set C<tabbedex-rs-prefix> to percent sign and
+use name of the plugin as prefix for other resource names (just like in the
+example above).  tabbedex will issue a warning if it is not followed.
 
 =over
 
@@ -204,25 +228,6 @@ This resource allows for this to be customised.  It's format is
 where <timeout> is timeout in seconds and <character> is a single activity
 character.  If activity character is (, [, { or < it will be used as left
 activity mark and matching character will be used on the right side.
-
-=item B<tabbedex-rs-prefix>: I<string>
-
-By default tabbedex uses the same prefix for resource names as tabbed plugin.
-If this is not desired, the resource can be used to set a new prefix, for
-example:
-
-    URxvt.tabbed.tabbedex-rs-prefix: tabbedex
-
-    ! Affects tabbed only:
-    URxvt.tabbed.tabbar-fg: 4
-    URxvt.tabbed.tabbar-bg: 0
-
-    ! Affects tabbedex only:
-    URxvt.tabbedex.tabbar-fg: 5
-    URxvt.tabbedex.tabbar-bg: 0
-
-This settings does not affect the B<tabbedex-rs-prefix> resource itself which is
-always read from C<URxvt.tabbed.tabbedex-rs-prefix>.
 
 =item B<title>: I<boolean>
 
@@ -622,16 +627,31 @@ sub copy_properties {
 }
 
 
+sub get_x_resource {
+	my ($root, $name) = @_;
+	my ($prefix, $extname) = ($root->{rs_prefix}, $root->{_name});
+	my $value = $root->x_resource("$prefix.$name");
+
+	if (defined $value && $prefix ne $extname && $prefix ne '%' &&
+	    !$root->{rs_prefix_warned}) {
+		urxvt::warn("$extname: ‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.\n");
+		urxvt::warn("$extname: With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘$extname’), for example:\n");
+		urxvt::warn("$extname:     URxvt.$extname.$name: $value\n");
+		$root->{rs_prefix_warned} = 1;
+	}
+	$value
+}
+
 sub rs_text {
-    my ($root, $name, $default) = @_;
-    my $value = $root->x_resource ($root->{rs_prefix} . '.' . $name);
-    defined $value ? $root->locale_decode($value) : $default;
+	my ($root, $name, $default) = @_;
+	my $value = $root->get_x_resource($name);
+	defined $value ? $root->locale_decode($value) : $default;
 }
 
 sub rs_bool {
-    my ($root, $name, $default) = @_;
-    my $val = $root->x_resource ($root->{rs_prefix} . '.' . $name);
-    defined $val ? $val !~ /^(?:false|0|no)$/i : $default;
+	my ($root, $name, $default) = @_;
+	my $value = $root->get_x_resource($name);
+	defined $value ? $value !~ /^(?:false|0|no|off)$/i : $default;
 }
 
 
@@ -764,8 +784,8 @@ sub on_init {
    $root->resource (int_bwidth => 0);
    $root->resource (pty_fd => -1);
 
-   $root->{rs_prefix} = 'tabbed';
-   $root->{rs_prefix} = $root->rs_text ('tabbedex-rs-prefix', 'tabbed');
+   $root->{rs_prefix} =
+      $root->x_resource('tabbed.tabbedex-rs-prefix') // 'tabbed';
 
    if (defined(my $key = $urxvt::OPTION{scrollBar})) {
       $root->{option}{$key} = $root->{term}->option($key, 0);
