@@ -698,14 +698,14 @@ sub on_key_release {
 
 sub key_event {
 	my ($root, $type, $event) = @_;
-	my $term = $root->{cur};
-	$term->$type($event->{state}, $event->{keycode}, $event->{time});
+	my $tab = $root->{cur};
+	$tab->$type($event->{state}, $event->{keycode}, $event->{time});
 
 	# refresh_check is available since rxvt-unicode 9.22.  For some reason
-	# $term->can('refresh_check') doesn’t work which is why eval block is
+	# $tab->can('refresh_check') doesn’t work which is why eval block is
 	# used to silence warnings.
 	eval {
-		$term->refresh_check;
+		$tab->refresh_check;
 	};
 	if ($@ && $@ !~ /refresh_check/) {
 		# If there was a warning unrelated to refresh_check propagate
