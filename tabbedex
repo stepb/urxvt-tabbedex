@@ -323,30 +323,24 @@ sub tab_bell_active ($$$) {
     return 0;
 }
 
-sub tab_activity_mark ($$;$) {
-   my ($root, $tab, $now) = @_;
-   return ' ' unless defined $tab->{last_activity};
-   $now = $now // int urxvt::NOW;
-   if (defined $root->{timeouts}) {
-      my $diff = $now - $tab->{last_activity};
-      for my $spec (@{ $root->{timeouts} }) {
-         return $spec->[1] if $diff >= $spec->[0];
-      }
-   }
-   '*';
-}
-
 {
 
-my %matching_activity_marks = (
-    '[' => ']',
-    '{' => '}',
-    '(' => ')',
-    '<' => '>',
-);
+my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
 
-sub matching_activity_mark {
-    return $matching_activity_marks{$_[0]} // $_[0];
+sub tab_activity_marks {
+	my ($root, $tab, $now) = @_;
+	if (!defined($tab->{last_activity})) {
+		return (' ', ' ');
+	} elsif (defined $root->{timeouts}) {
+		my $diff = ($now // int urxvt::NOW) - $tab->{last_activity};
+		for my $spec (@{ $root->{timeouts} }) {
+			my ($time, $left) = @$spec;
+			if ($diff >= $time) {
+				return ($left, $matching_marks{$left} // $left);
+			}
+		}
+	}
+	('*', '*')
 }
 
 }
@@ -506,9 +500,8 @@ sub refresh {
 		my $tab = $root->{tabs}[$idx];
 		my $color_idx = (2 * $root->tab_bell_active($tab, $now) +
 		                 ($tab == $root->{cur}));
-		my $act = $root->tab_activity_mark($tab, $now);
-		$name = $act . $name . matching_activity_mark($act);
-		$bar->add_button($name, $color_idx, $idx);
+		my ($left, $right) = $root->tab_activity_marks($tab, $now);
+		$bar->add_button($left . $name . $right, $color_idx, $idx);
 		if ($tab->is_being_renamed) {
 			$bar->put_cursor(-2);
 		}
@@ -1020,9 +1013,9 @@ sub tab_add_lines {
 	my ($root, $tab) = @_;
 	if ($tab != $root->{cur}) {
 		my $now = int urxvt::NOW;
-		my $mark = $root->tab_activity_mark($tab, $now);
+		my $mark = $root->tab_activity_marks($tab, $now);
 		$tab->{last_activity} = $now;
-		if ($mark ne $root->tab_activity_mark($tab, $now)) {
+		if ($mark ne $root->tab_activity_marks($tab, $now)) {
 			$root->refresh;
 		}
 	}
