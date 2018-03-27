@@ -326,7 +326,6 @@ sub tab_bell_active ($$$) {
 sub tab_activity_mark ($$;$) {
    my ($root, $tab, $now) = @_;
    return ' ' unless defined $tab->{last_activity};
-   return ' ' if $tab == $root->{cur};
    $now = $now // int urxvt::NOW;
    if (defined $root->{timeouts}) {
       my $diff = $now - $tab->{last_activity};
@@ -1018,12 +1017,16 @@ sub tab_bell {
 
 
 sub tab_add_lines {
-    my ($root, $tab) = @_;
-    my $now = int urxvt::NOW;
-    my $mark = $root->tab_activity_mark($tab, $now);
-    $tab->{last_activity} = $now;
-    $root->refresh if $mark ne $root->tab_activity_mark($tab, $now);
-    ();
+	my ($root, $tab) = @_;
+	if ($tab != $root->{cur}) {
+		my $now = int urxvt::NOW;
+		my $mark = $root->tab_activity_mark($tab, $now);
+		$tab->{last_activity} = $now;
+		if ($mark ne $root->tab_activity_mark($tab, $now)) {
+			$root->refresh;
+		}
+	}
+	();
 }
 
 
