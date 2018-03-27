@@ -787,12 +787,12 @@ sub on_init {
                                  '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█');
    if ($timeouts) {
       my @timeouts;
-      while ($timeouts =~ /^(\d+):(.)(?::(.*))?$/) {
-         push @timeouts, [ int $1, $2 ];
-         $timeouts = defined $3 ? $3 : '';
+      my $re = eval { qr/\G(\d+):(\X)(?::|$)/ } // qr/\G(\d+):(.)(?::|$)/;
+      while ($timeouts =~ /$re/g) {
+         push @timeouts, [ $1, $root->{term}->special_encode($2) ];
       }
       if (@timeouts) {
-         $root->{timeouts} = [ sort { $b->[0] <=> $a-> [0] } @timeouts ];
+         $root->{timeouts} = [ sort { $b->[0] <=> $a->[0] } @timeouts ];
       }
    }
 
