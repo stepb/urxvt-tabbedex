@@ -619,34 +619,6 @@ sub copy_properties {
 }
 
 
-sub get_x_resource {
-	my ($root, $name) = @_;
-	my ($prefix, $extname) = ($root->{rs_prefix}, $root->{_name});
-	my $value = $root->x_resource("$prefix.$name");
-
-	if (defined $value && $prefix ne $extname && $prefix ne '%' &&
-	    !$root->{rs_prefix_warned}) {
-		urxvt::warn("$extname: ‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.\n");
-		urxvt::warn("$extname: With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘$extname’), for example:\n");
-		urxvt::warn("$extname:     URxvt.$extname.$name: $value\n");
-		$root->{rs_prefix_warned} = 1;
-	}
-	$value
-}
-
-sub rs_text {
-	my ($root, $name, $default) = @_;
-	my $value = $root->get_x_resource($name);
-	defined $value ? $root->locale_decode($value) : $default;
-}
-
-sub rs_bool {
-	my ($root, $name, $default) = @_;
-	my $value = $root->get_x_resource($name);
-	defined $value ? $value !~ /^(?:false|0|no|off)$/i : $default;
-}
-
-
 sub make_current {
 	my ($root, $tab) = @_;
 
@@ -767,6 +739,73 @@ sub register_keysyms {
     }
 }
 
+{
+	package urxvt::ext::tabbedex::rs_reader;
+
+	sub new {
+		my ($class, $root) = @_;
+		my $prefix = $root->x_resource('tabbed.tabbedex-rs-prefix');
+		bless [$root, $prefix // 'tabbed', $root->{_name}], $class
+	}
+
+	sub text {
+		my ($rs, $name, $default) = @_;
+		my ($root, $prefix, $extname) = @$rs;
+		my $value = $root->x_resource("$prefix.$name");
+		if (defined $value && defined $extname &&
+		    $prefix ne $extname && $prefix ne '%') {
+			urxvt::warn("$extname: ‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.\n");
+			urxvt::warn("$extname: With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘$extname’), for example:\n");
+			urxvt::warn("$extname:     URxvt.$extname.$name: $value\n");
+			pop @$rs;
+		}
+		defined $value ? $root->locale_decode($value) : $default
+	}
+
+	sub bool {
+		my $value = $_[0]->text($_[1]);
+		defined $value ? $value !~ /^(?:false|0|no|off)$/i : $_[2];
+	}
+
+	sub colours {
+		my $rs = shift;
+
+		my (@suffix, %used) = ('-fg', '-bg');
+		for my $c (@_) {
+			for my $i (0, 1) {
+				my $value = $rs->text($c->[2] . $suffix[$i]);
+				if (defined $value) {
+					$value =~ s/\s+/ /g;
+					$value =~ s/^ | $//g;
+					if ($value =~ /^[-#a-zA-Z0-9 ]/) {
+						$c->[$i] = $value;
+					}
+				}
+				$used{$c->[$i]} = undef;
+			}
+		}
+
+		my ($i, $cmd) = (0, '');
+		for my $key (keys %used) {
+			if ($key =~ /^-?\d+$/ && -2 <= $key && $key <= 255) {
+				$used{$key} = $key + 2;
+			} else {
+				++$i while exists $used{$i};
+				$cmd .= ';' . $i . ';' . $key;
+				$used{$key} = $used{$i} = $i + 2;
+			}
+		}
+
+		my $default = urxvt::DEFAULT_RSTYLE;
+		for $i (0..$#_) {
+			my ($fg, $bg) = @{ $_[$i] };
+			$_[$i] = urxvt::SET_COLOR $default, $used{$fg}, $used{$bg};
+		}
+
+		(\@_, $cmd ? "\e]4$cmd\a" : '')
+	}
+}
+
 sub on_init {
    my ($root) = @_;
 
@@ -776,15 +815,14 @@ sub on_init {
    $root->resource (int_bwidth => 0);
    $root->resource (pty_fd => -1);
 
-   $root->{rs_prefix} =
-      $root->x_resource('tabbed.tabbedex-rs-prefix') // 'tabbed';
-
    if (defined(my $key = $urxvt::OPTION{scrollBar})) {
       $root->{option}{$key} = $root->{term}->option($key, 0);
    }
 
-   my $timeouts = $root->rs_text('tabbar-timeouts',
-                                 '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█');
+   my $rs = new urxvt::ext::tabbedex::rs_reader($root);
+
+   my $timeouts = $rs->text('tabbar-timeouts',
+                            '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█');
    if ($timeouts) {
       my @timeouts;
       my $re = eval { qr/\G(\d+):(\X)(?::|$)/ } // qr/\G(\d+):(.)(?::|$)/;
@@ -792,87 +830,43 @@ sub on_init {
          push @timeouts, [ $1, $root->{term}->special_encode($2) ];
       }
       if (@timeouts) {
-         $root->{timeouts} = [ sort { $b->[0] <=> $a->[0] } @timeouts ];
+         @timeouts = sort { $b->[0] <=> $a->[0] } @timeouts;
+         $root->{timeouts} = \@timeouts;
       }
    }
 
-   $root->{bell_timeout} = int($root->rs_text ('bell-timeout') // 1);
+   $root->{bell_timeout}    = int($rs->text('bell-timeout') // 1);
+   $root->{new_button}      = $rs->bool('new-button', 0);
+   $root->{tab_title}       = $rs->bool('title', 1);
+   $root->{autohide}        = $rs->bool('autohide', 1);
+   $root->{no_default_keys} = $rs->bool('no-tabbedex-keys', 0);
+   $root->{reopen_on_close} = $rs->bool('reopen-on-close', 0);
+   $root->{new_tab_command} = $rs->text('new-tab-command', 'inherit');
 
-   $root->{new_button} = $root->rs_bool ('new-button', 0);
-   $root->{tab_title} = $root->rs_bool ('title', 1);
-   $root->{autohide} = $root->rs_bool ('autohide', 1);
-   $root->{no_default_keys} = $root->rs_bool ('no-tabbedex-keys', 0);
-   $root->{reopen_on_close} = $root->rs_bool ('reopen-on-close', 0);
-   $root->{new_tab_command} = $root->rs_text ('new-tab-command', 'inherit');
+   my @blacklist = split(',', $rs->text('perl-ext-blacklist'));
+   $root->{perl_ext_blacklist} = join ',-', ',-tabbedex', @blacklist;
+
+   my ($colours, $colours_cmd) = $rs->colours([3, 0, 'tabbar'],
+                                              [0, 1, 'tab'],
+                                              [0, 3, 'bell'],
+                                              [5, 4, 'bell-tab'],
+                                              [2, 0, 'title']);
+   $root->{init_cmd} = "$colours_cmd\033[?25l";
+   $root->{rs_colours} = $colours;
 
    $root->register_keysyms;
 
-   my @blacklist = split(',', $root->rs_text ('perl-ext-blacklist'));
-   $root->{perl_ext_blacklist} = join (',-', ',-tabbedex', @blacklist);
-
    ();
-}
-
-sub rs_read_colours {
-	my ($root) = @_;
-
-	my %used;
-	my $rs_colour = sub {
-		my $val = $root->rs_text($_[0]) // $_[1];
-		$val =~ s/\s+/ /g;
-		$val =~ s/^ | $//g;
-		if ($val !~ /^[-#a-zA-Z0-9 ]/) {
-			$val = $_[1];
-		}
-		$used{$val} = undef;
-		$val
-	};
-
-	my @colours = (['tabbar', 3, 0],
-	               ['tab', 0, 1],
-	               ['bell', 0, 3],
-	               ['bell-tab', 5, 4],
-	               ['title', 2, 0]);
-
-	for my $c (@colours) {
-		my $prefix = shift @$c;
-		$c->[0] = $rs_colour->($prefix . '-fg', $c->[0]);
-		$c->[1] = $rs_colour->($prefix . '-bg', $c->[1]);
-	}
-
-	my ($i, $cmd) = (0, '');
-	for my $key (keys %used) {
-		if ($key =~ /^-?\d+$/ && -2 <= $key && $key <= 255) {
-			$used{$key} = $key + 2;
-		} else {
-			++$i while exists $used{$i};
-			$cmd .= ';' . $i . ';' . $key;
-			$used{$key} = $used{$i} = $i + 2;
-		}
-	}
-
-	if ($cmd) {
-		$root->cmd_parse("\e]4$cmd\a");
-	}
-
-	my $def = urxvt::DEFAULT_RSTYLE;
-	for $i (0..$#colours) {
-		my ($fg, $bg) = @{ $colours[$i] };
-		$colours[$i] = urxvt::SET_COLOR $def, $used{$fg}, $used{$bg};
-	}
-	\@colours
 }
 
 sub on_start {
    my ($root) = @_;
 
-   $root->{rs_colours} = $root->rs_read_colours;
-
    $root->{maxtabheight} =
       $root->int_bwidth + $root->fheight + $root->lineSpace;
    $root->{tabheight} = $root->{autohide} ? 0 : $root->{maxtabheight};
 
-   $root->cmd_parse ("\033[?25l");
+   $root->cmd_parse(delete $root->{init_cmd});
 
    my @argv = $root->argv;
    do {
