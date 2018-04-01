@@ -332,7 +332,7 @@ sub tab_activity_marks {
 	if (!defined($tab->{last_activity})) {
 		return (' ', ' ');
 	} elsif (defined $root->{timeouts}) {
-		my $diff = ($now // int urxvt::NOW) - $tab->{last_activity};
+		my $diff = $now - $tab->{last_activity};
 		for my $spec (@{ $root->{timeouts} }) {
 			my ($time, $left) = @$spec;
 			if ($diff >= $time) {
