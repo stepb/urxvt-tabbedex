@@ -311,18 +311,6 @@ Sets name of the current tab to I<name>.
 use Encode qw(decode);
 
 
-sub tab_bell_active ($$$) {
-    my ($root, $tab, $now) = @_;
-    if ($tab->{bell_rung}) {
-        if ($tab == $root->{cur}) {
-            return $now - $tab->{bell_rung} < $root->{bell_timeout};
-        } else {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 {
 
 my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
@@ -498,8 +486,8 @@ sub refresh {
 	for (my $now = int urxvt::NOW; $idx <= $last; ++$idx) {
 		my $name = $get_name->($idx);
 		my $tab = $root->{tabs}[$idx];
-		my $color_idx = (2 * $root->tab_bell_active($tab, $now) +
-		                 ($tab == $root->{cur}));
+		my $color_idx = ($tab == $root->{cur}) +
+			2 * ($now < $tab->{bell_ends});
 		my ($left, $right) = $root->tab_activity_marks($tab, $now);
 		$bar->add_button($left . $name . $right, $color_idx, $idx);
 		if ($tab->is_being_renamed) {
@@ -533,6 +521,7 @@ sub new_tab {
    push @urxvt::TERM_INIT, sub {
       my ($term) = @_;
       $term->{root} = $root;
+      $term->{bell_ends} = 0;
 
       for (0 .. urxvt::NUM_RESOURCES - 1) {
          my $value = $root->{resource}[$_];
@@ -620,7 +609,7 @@ sub copy_properties {
 
 
 sub make_current {
-	my ($root, $tab) = @_;
+	my ($root, $tab, $bell_ends) = @_;
 
 	my $cur = $root->{cur};
 	if ($cur == $tab) {
@@ -629,7 +618,7 @@ sub make_current {
 
 	if ($cur) {
 		delete $cur->{last_activity};
-		delete $cur->{bell_rung};
+		$cur->{bell_ends} = 0;
 		$cur->XUnmapWindow ($cur->parent) if $cur->mapped;
 		$cur->focus_out;
 	}
@@ -644,7 +633,7 @@ sub make_current {
 
 	$tab->XMapWindow ($tab->parent);
 	delete $tab->{last_activity};
-	delete $tab->{bell_rung};
+	$tab->{bell_ends} = $bell_ends // 0;
 
 	$root->refresh;
 }
@@ -981,22 +970,24 @@ sub tab_property_notify {
 sub tab_bell {
 	my ($root, $tab, $event) = @_;
 	my $now = int urxvt::NOW;
-	my $bell = $root->tab_bell_active($tab, $now);
-	$tab->{bell_rung} = $now;
-	if ($tab != $root->{cur}) {
-		my ($map, $urgent) = map {
-			my $key = $urxvt::OPTION{$_};
-			defined $key ? $tab->option($key) : 0
-		} qw/mapAlert urgentOnBell/;
-		if ($urgent) {
-			$root->{term}->set_urgency(1);
-		}
-		if ($map) {
-			$root->make_current($tab);
-			return;
-		}
+
+	my $key = $urxvt::OPTION{urgentOnBell};
+	if (defined($key) && $tab->option($key) && !$root->{term}->focus) {
+		$root->{term}->set_urgency(1);
 	}
-	if ($bell ne $root->tab_bell_active($tab, $now)) {
+
+	my $bell = $now < $tab->{bell_ends};
+	if ($tab == $root->{cur}) {
+		$tab->{bell_ends} = $now + $root->{bell_timeout};
+	} elsif (defined($key = $urxvt::OPTION{mapAlert}) &&
+	         $tab->option($key)) {
+		$root->make_current($tab, $now + $root->{bell_timeout});
+		return;
+	} else {
+		$tab->{bell_ends} = ~0;
+	}
+
+	if ($bell != ($now < $tab->{bell_ends})) {
 		$root->refresh;
 	}
 	();
