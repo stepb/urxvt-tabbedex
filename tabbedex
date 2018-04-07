@@ -174,28 +174,46 @@ Foreground and background colours of the tab title.  (2, 0) by default which
 translates to green on black.  See B<tabbar-fg> for more documentation on how
 colours can be specified.
 
-=item B<new-tab-command>: I<string>
+=item B<new-tab-command>: I<multiline-string>
 
-Specifies how urxvt's B<-e> switch affects tabs created by tabbedex.  The
-resource can have one of three values:
+Configures what commands to run in each new tab.  The first tab uses B<-e>
+option passed on urxvt's command line (if any) while behaviour of subsequent
+tabs is controlled by this resource.  Each line specifies command to run and can
+be one of:
 
 =over
 
+=item Empty line
+
+No B<-e> flag is used at all even if urxvt was started with one.  Value I<clear>
+is also recognised though deprecated and support for it will be removed in the
+future.
+
 =item I<inherit>
 
-The default.  The B<-e> command will be used by all tabs created by tabbedex.
-
-=item I<clear>
-
-Only the initial tab will use the B<-e> switch provided on urxvt's command line.
-All other tabs will act as if the option was not provided.
+The same command as the one used when creating the initial tab is used.  This
+means reusing urxvt's B<-e> flag if it was specified, or not providing it if it
+wasn't.
 
 =item I<-e B<another command>>
 
-The initial tab will use the B<-e> switch provided on urxvt's command line (if
-any) while all other tabs will use switch specified by this setting.
+Specified command is used effectively overriding whatever B<-e> flag was
+provided as urxvt argument (if any).
 
 =back
+
+Once commands specified in B<new-tab-command> run out, all subsequent tabs use
+the same command as the last tab.  For example, let's look at the following
+configuration:
+
+    URxvt.tabbedex.new-tab-command: \
+        -e /usr/bin/irssi \n\
+        -e /bin/sh -c 'echo /var/log/syslog:; exec tail -f /var/log/syslog' \n\
+        clear
+
+If urxvt is started with B<-e /usr/bin/emacs> switch and user creates total of
+five tabs, the commands run in each will be: Emacs, Irssi, tailing of
+C</var/log/syslog> and two shells.
 
 =item B<no-tabbedex-keys>: I<boolean>
 
@@ -674,10 +692,14 @@ sub new_tab {
 	my ($root) = @_;
 	push @urxvt::TERM_INIT, sub { $root->tab_term_init($_[0]) };
 	push @urxvt::TERM_EXT, urxvt::ext::tabbedex::;
-	new urxvt::term
-		$root->env, $urxvt::RXVTNAME,
-		-embed => $root->parent,
-		@{ $root->{argv} }
+
+	my $args = $root->{argv}[0];
+	if (@{ $root->{argv} } > 1) {
+		shift @{ $root->{argv} };
+	}
+
+	new urxvt::term $root->env,
+	                $urxvt::RXVTNAME, -embed => $root->parent, @$args
 }
 
 
@@ -874,7 +896,7 @@ sub init {
    $root->{autohide}         = $rs->bool('autohide', 1);
    $root->{register_keysyms} = !$rs->bool('no-tabbedex-keys', 0);
    $root->{reopen_on_close}  = $rs->bool('reopen-on-close', 0);
-   $root->{new_tab_command}  = $rs->text('new-tab-command', 'inherit');
+   $root->{argv}             = $rs->argv('new-tab-command', $root->argv);
 
    if (my $blacklist = $rs->text('perl-ext-blacklist')) {
        $blacklist =~ s/,/,-/;
@@ -899,28 +921,11 @@ _on start => sub {
 
    $root->cmd_parse(delete $root->{init_cmd});
 
-   my @argv = $root->argv;
-   do {
-      shift @argv;
-   } while @argv && $argv[0] ne "-e";
-   $root->{argv} = \@argv;
-
    if ($root->{tab_title}) {
       $root->{tab_title} = $root->XInternAtom("_NET_WM_NAME", 1);
    }
 
    $root->new_tab;
-
-   my $cmd = delete $root->{new_tab_command};
-   if ($cmd eq 'inherit') {
-      # nop
-   } elsif ($cmd eq 'clear') {
-      $root->{argv} = [];
-   } elsif ($cmd =~ /^-e\s/) {
-      $root->{argv} = [Text::ParseWords::shellwords($cmd)];
-   } else {
-      printf "tabbedex: unrecognised value of new-tab-command: '%s'\n", $cmd;
-   }
 
    if (defined $root->{timeouts}) {
       my $interval = ($root->{timeouts}[@{ $root->{timeouts} } - 1]->[0]);
@@ -1306,6 +1311,37 @@ sub colours {
 	}
 
 	(\@_, $cmd ? "\e]4$cmd\a" : '')
+}
+
+sub argv {
+	my $rs = shift;
+	my $cmd = $rs->text(shift) // '';
+
+	do {
+		shift;
+	} while @_ && $_[0] ne '-e';
+
+	my $empty = [];
+	[\@_, map {
+		s/^\s+|\s+$//g;
+		if ($_ eq '') {
+			($empty)
+		} elsif ($_ eq 'clear') {
+			urxvt::warn('tabbedex: value ‘clear’ of ' .
+			            '‘new-tab-command’ resource is ' .
+			            "deprecated; use empty line instead\n");
+			($empty)
+		} elsif ($_ eq 'inherit') {
+			(\@_)
+		} elsif (/^-e\s/) {
+			([Text::ParseWords::shellwords($_)])
+		} else {
+			urxvt::warn('tabbedex: unrecognised value of ' .
+			            '‘new-tab-command’ resource: ‘' . $_ .
+			            "’\n");
+			()
+		}
+	} split /\n/, $cmd]
 }
 
 
