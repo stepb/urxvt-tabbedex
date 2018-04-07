@@ -521,7 +521,6 @@ sub new_tab {
    push @urxvt::TERM_INIT, sub {
       my ($term) = @_;
       $term->{root} = $root;
-      $term->{bell_ends} = 0;
 
       for (0 .. urxvt::NUM_RESOURCES - 1) {
          my $value = $root->{resource}[$_];
@@ -1106,6 +1105,12 @@ package urxvt::ext::tabbedex::tab;
 
 # helper extension implementing the subwindows of a tabbed terminal.
 # simply proxies all interesting calls back to the tabbedex class.
+
+
+sub on_init {
+	$_[0]{bell_ends} = 0;
+}
+
 
 for (qw(start destroy user_command property_notify add_lines bell
         osc_seq_perl)) {
