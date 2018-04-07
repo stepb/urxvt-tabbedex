@@ -832,7 +832,8 @@ sub on_init {
    $root->{new_tab_command} = $rs->text('new-tab-command', 'inherit');
 
    my @blacklist = split(',', $rs->text('perl-ext-blacklist'));
-   $root->{perl_ext_blacklist} = join ',-', ',-tabbedex', @blacklist;
+   $root->{perl_ext_blacklist} =
+      join ',-', ',-tabbedex', $root->{_name}, @blacklist;
 
    my ($colours, $colours_cmd) = $rs->colours([3, 0, 'tabbar'],
                                               [0, 1, 'tab'],
