@@ -576,12 +576,11 @@ sub refresh {
 	}
 
 	if ($root->{tab_title} && $bar->space_left) {
-		my $term = $root->{term};
-		my @str = $term->XGetWindowProperty(
-			$term->parent, $root->{tab_title});
+		my @str = $root->XGetWindowProperty(
+			$root->parent, $root->{tab_title});
 		if (@str && $str[2]) {
 			my $str = decode('utf8', $str[2]);
-			$bar->add_title($root->{term}->special_encode($str));
+			$bar->add_title($root->special_encode($str));
 		}
 	}
 
@@ -601,7 +600,7 @@ sub tab_term_init {
 
 	foreach my $key (values %urxvt::OPTION) {
 		my $val = exists $root->{option}{$key}
-		  ? $root->{option}{$key} : $root->{term}->option($key);
+		  ? $root->{option}{$key} : $root->option($key);
 		$term->option($key, $val);
 	}
 
@@ -790,7 +789,7 @@ sub init {
    $root->resource (pty_fd => -1);
 
    if (defined(my $key = $urxvt::OPTION{scrollBar})) {
-      $root->{option}{$key} = $root->{term}->option($key, 0);
+      $root->{option}{$key} = $root->option($key, 0);
    }
 
    my $rs = new urxvt::ext::tabbedex::rs_reader($root);
@@ -801,7 +800,7 @@ sub init {
       my @timeouts;
       my $re = eval { qr/\G(\d+):(\X)(?::|$)/ } // qr/\G(\d+):(.)(?::|$)/;
       while ($timeouts =~ /$re/g) {
-         push @timeouts, [ $1, $root->{term}->special_encode($2) ];
+         push @timeouts, [ $1, $root->special_encode($2) ];
       }
       if (@timeouts) {
          @timeouts = sort { $b->[0] <=> $a->[0] } @timeouts;
@@ -817,9 +816,10 @@ sub init {
    $root->{reopen_on_close}  = $rs->bool('reopen-on-close', 0);
    $root->{new_tab_command}  = $rs->text('new-tab-command', 'inherit');
 
-   my @blacklist = split(',', $rs->text('perl-ext-blacklist'));
-   $root->{perl_ext_blacklist} =
-      join ',-', ',-tabbedex', $root->{_name}, @blacklist;
+   if (my $blacklist = $rs->text('perl-ext-blacklist')) {
+       $blacklist =~ s/,/,-/;
+       $root->{perl_ext_blacklist} = ',-' . $blacklist;
+   }
 
    my ($colours, $colours_cmd) = $rs->colours([3, 0, 'tabbar'],
                                               [0, 1, 'tab'],
@@ -846,7 +846,7 @@ _on start => sub {
    $root->{argv} = \@argv;
 
    if ($root->{tab_title}) {
-      $root->{tab_title} = $root->{term}->XInternAtom("_NET_WM_NAME", 1);
+      $root->{tab_title} = $root->XInternAtom("_NET_WM_NAME", 1);
    }
 
    $root->new_tab;
@@ -952,8 +952,8 @@ sub tab_bell {
 	my $now = int urxvt::NOW;
 
 	my $key = $urxvt::OPTION{urgentOnBell};
-	if (defined($key) && $tab->option($key) && !$root->{term}->focus) {
-		$root->{term}->set_urgency(1);
+	if (defined($key) && $tab->option($key) && !$root->focus) {
+		$root->set_urgency(1);
 	}
 
 	my $bell = $now < $tab->{bell_ends};
@@ -1073,8 +1073,8 @@ sub tab_osc_seq_perl {
 	my ($root, $tab, $osc) = @_;
 
 	if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
-		my $name = $root->{term}->locale_decode($1);
-		if ($tab->set_name($root->{term}->special_encode($name))) {
+		my $name = $root->locale_decode($1);
+		if ($tab->set_name($root->special_encode($name))) {
 			$root->refresh;
 		}
 		1;
@@ -1186,8 +1186,8 @@ sub _rename_tab_key_press {
 	} elsif (_is_backspace $event, $keysym) {
 		substr $tab->{name}, -2, 1, '';
 	} elsif ($octets !~ /[\x00-\x1f]/) {
-		my $text = $tab->{term}->locale_decode($octets);
-		substr $tab->{name}, -1, 0, $tab->{term}->special_encode($text);
+		my $text = $tab->locale_decode($octets);
+		substr $tab->{name}, -1, 0, $tab->special_encode($text);
 	} else {
 		return 1;
 	}
