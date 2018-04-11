@@ -310,6 +310,20 @@ Sets name of the current tab to I<name>.
 
 use Encode qw(decode);
 
+{
+	my %hooks;
+
+	sub _on($&) {
+		my ($hook, $sub) = @_;
+		$hooks{$hook} = $sub
+	}
+
+	sub enable_hooks {
+		my ($root) = @_;
+		$root->enable(%hooks);
+		undef %hooks;
+	}
+}
 
 {
 
@@ -638,35 +652,33 @@ sub make_current {
 }
 
 
-sub on_focus_in {
+_on focus_in => sub {
    my ($root, $event) = @_;
    $root->{cur}->focus_in;
    ();
-}
+};
 
-sub on_focus_out {
+_on focus_out => sub {
    my ($root, $event) = @_;
    $root->{cur}->focus_out;
    ();
-}
+};
 
-sub on_tt_write {
+_on tt_write => sub {
     my ($root, $octets) = @_;
-
     $root->{cur}->tt_write ($octets);
-
     1
-}
+};
 
-sub on_key_press {
+_on key_press => sub {
    my ($root, $event) = @_;
    $root->key_event('key_press', $event);
-}
+};
 
-sub on_key_release {
+_on key_release => sub {
    my ($root, $event) = @_;
    $root->key_event('key_release', $event);
-}
+};
 
 sub key_event {
 	my ($root, $type, $event) = @_;
@@ -687,7 +699,7 @@ sub key_event {
 	1;
 }
 
-sub on_button_release {
+_on button_release => sub {
 	my ($root, $event) = @_;
 
 	if ($root->{cur}->is_being_renamed || $event->{row} != 0 ||
@@ -708,7 +720,7 @@ sub on_button_release {
 		}
 	}
 	1;
-}
+};
 
 sub register_keysyms {
     my ($root, $tab) = @_;
@@ -729,6 +741,8 @@ sub register_keysyms {
 
 sub on_init {
    my ($root) = @_;
+
+   $root->enable_hooks;
 
    $root->{resource} = [map $root->resource ("+$_"),
                             0 .. urxvt::NUM_RESOURCES - 1];
@@ -781,7 +795,7 @@ sub on_init {
    ();
 }
 
-sub on_start {
+_on start => sub {
    my ($root) = @_;
 
    $root->{maxtabheight} =
@@ -823,20 +837,18 @@ sub on_start {
    }
 
    ();
-}
+};
 
 
-sub on_configure_notify {
+_on configure_notify => sub {
    my ($root, $event) = @_;
-
    $root->configure;
    $root->refresh;
-
    ();
-}
+};
 
 
-sub on_wm_delete_window {
+_on wm_delete_window => sub {
 	my ($root) = @_;
 	# Disable reopen-on-close so we respect delete window request.  If
 	# reopen-on-close was to remain true, as soon as last tab was closed
@@ -844,7 +856,7 @@ sub on_wm_delete_window {
 	$root->{reopen_on_close} = 0;
 	$_->destroy for @{ $root->{tabs} };
 	1;
-}
+};
 
 
 sub tab_start {
@@ -941,11 +953,11 @@ sub tab_add_lines {
 }
 
 
-sub on_user_command {
+_on user_command => sub {
 	my $root = shift;
 	unshift @_, $root, $root->{cur}, @_;
 	goto \&tab_user_command;
-}
+};
 
 sub tab_user_command {
   my ($root, $tab, $cmd) = @_;
@@ -1041,21 +1053,20 @@ package urxvt::ext::tabbedex::tab;
 # simply proxies all interesting calls back to the tabbedex class.
 
 
-sub on_init {
-	$_[0]{bell_ends} = 0;
+sub enable_hooks {
+	for my $hook (qw(start destroy user_command property_notify add_lines
+	                 bell osc_seq_perl)) {
+		my $name = "urxvt::ext::tabbedex::tab_$hook";
+		$_[0]->enable($hook => sub {
+			unshift @_, $_[0]{term}{root};
+			goto &$name;
+		});
+	};
 }
 
-
-for (qw(start destroy user_command property_notify add_lines bell
-        osc_seq_perl)) {
-	eval qq{
-		sub on_$_ {
-			my \$root = \$_[0]{term}{root} or return;
-			unshift \@_, \$root;
-			goto \\&urxvt::ext::tabbedex::tab_$_;
-		}
-	};
-	die if $@;
+sub on_init {
+	$_[0]->enable_hooks;
+	$_[0]{bell_ends} = 0;
 }
 
 
