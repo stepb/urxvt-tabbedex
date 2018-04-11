@@ -308,6 +308,68 @@ Sets name of the current tab to I<name>.
 
 =cut
 
+use Scalar::Util;
+
+
+# An initialisation hook which is called in root/master and slave tabs.  It’s
+# purpose is to determine which one the object is and call that type’s
+# initialisation code.
+#
+# The reason we do it this way rather than directly pointing urxvt at correct
+# package is that we want urxvt to think that master and slave tabs both use
+# ‘tabbedex’ extension.  Previously, the code would point tabs to
+# a ‘urxvt::ext::tabbedex::tab’ extension but that resulted in terminal thinking
+# the extension is ‘tabbedex::tab’ (actually it was even more complicated than
+# that) and actions weren’t dispatched correctly.
+#
+# Now, no matter if it’s root or not, from urxvt’s point of view it’s all
+# ‘tebbedex’ plugin.
+sub on_init {
+	my ($self) = @_;
+
+	# If we are root tab, then terminal’s 'tabbedex-root-tab' property is
+	# not set.  Otherwise it is set and it points to the root tab.
+	my $root = delete $self->{term}{'tabbedex-root-tab'};
+	my $type = 'root';
+	if (defined $root) {
+		$type = 'tab';
+		$self->{root} = $root;
+	}
+
+	# Copy ISA so things behave the same way.
+	my $pkg = Scalar::Util::blessed($self);
+	@{"urxvt::ext::tabbedex::$type\::ISA"} = @{"$pkg\::ISA"};
+
+	# Change type of the object so methods in proper package are used.
+	bless $self, "urxvt::ext::tabbedex::$type";
+
+	# And continue initialisation.
+	$self->enable_hooks;
+	$self->init;
+	if ($root->{register_keysyms}) {
+		register_keysyms($self);
+	}
+
+	()
+}
+
+sub register_keysyms {
+	my ($self) = @_;
+	$self->parse_keysym('Shift-Left', 'perl:tabbedex:prev_tab');
+	$self->parse_keysym('Shift-Right', 'perl:tabbedex:next_tab');
+	$self->parse_keysym('Shift-Down', 'perl:tabbedex:new_tab');
+	$self->parse_keysym('Shift-Up', 'perl:tabbedex:rename_tab');
+	$self->parse_keysym('Control-Left', 'perl:tabbedex:move_tab_left');
+	$self->parse_keysym('Control-Right', 'perl:tabbedex:move_tab_right');
+	for my $num (1..12) {
+		$self->parse_keysym('Meta-F' . $num,
+				    'perl:tabbedex:goto_tab_' . $num);
+	}
+}
+
+
+package urxvt::ext::tabbedex::root;
+
 use Encode qw(decode);
 
 {
@@ -527,41 +589,36 @@ sub refresh {
 	$root->want_refresh;
 }
 
+sub tab_term_init {
+	my ($root, $term) = @_;
+	$term->{'tabbedex-root-tab'} = $root;
+
+	for (0 .. urxvt::NUM_RESOURCES - 1) {
+		if (defined(my $value = $root->{resource}[$_])) {
+			$term->resource("+$_" => $value);
+		}
+	}
+
+	foreach my $key (values %urxvt::OPTION) {
+		my $val = exists $root->{option}{$key}
+		  ? $root->{option}{$key} : $root->{term}->option($key);
+		$term->option($key, $val);
+	}
+
+	if (defined(my $blacklist = $root->{perl_ext_blacklist})) {
+		$term->resource(perl_ext_2 =>
+			$term->resource('perl_ext_2') . $blacklist);
+	}
+}
 
 sub new_tab {
-   my ($root) = @_;
-
-   # save a backlink to us, make sure tabbedex is inactive
-   push @urxvt::TERM_INIT, sub {
-      my ($term) = @_;
-      $term->{root} = $root;
-
-      for (0 .. urxvt::NUM_RESOURCES - 1) {
-         my $value = $root->{resource}[$_];
-
-         $term->resource ("+$_" => $value)
-            if defined $value;
-      }
-
-      foreach my $key (values %urxvt::OPTION) {
-         my $val = exists $root->{option}{$key}
-           ? $root->{option}{$key} : $root->{term}->option($key);
-         $term->option($key, $val);
-      }
-
-      $term->resource (perl_ext_2 =>
-                       $term->resource ('perl_ext_2') .
-                       $root->{perl_ext_blacklist});
-
-      $root->register_keysyms($term);
-   };
-
-   push @urxvt::TERM_EXT, urxvt::ext::tabbedex::tab::;
-
-   my $term = new urxvt::term
-      $root->env, $urxvt::RXVTNAME,
-      -embed => $root->parent,
-      @{ $root->{argv} };
+	my ($root) = @_;
+	push @urxvt::TERM_INIT, sub { $root->tab_term_init($_[0]) };
+	push @urxvt::TERM_EXT, urxvt::ext::tabbedex::;
+	new urxvt::term
+		$root->env, $urxvt::RXVTNAME,
+		-embed => $root->parent,
+		@{ $root->{argv} }
 }
 
 
@@ -722,27 +779,9 @@ _on button_release => sub {
 	1;
 };
 
-sub register_keysyms {
-    my ($root, $tab) = @_;
-    if (!$root->{no_default_keys}) {
-        $tab //= $root;
-        $tab->parse_keysym('Shift-Left', 'perl:tabbedex:prev_tab');
-        $tab->parse_keysym('Shift-Right', 'perl:tabbedex:next_tab');
-        $tab->parse_keysym('Shift-Down', 'perl:tabbedex:new_tab');
-        $tab->parse_keysym('Shift-Up', 'perl:tabbedex:rename_tab');
-        $tab->parse_keysym('Control-Left', 'perl:tabbedex:move_tab_left');
-        $tab->parse_keysym('Control-Right', 'perl:tabbedex:move_tab_right');
-        for my $num (1..12) {
-            $tab->parse_keysym('Meta-F' . $num,
-                               'perl:tabbedex:goto_tab_' . $num);
-        }
-    }
-}
 
-sub on_init {
+sub init {
    my ($root) = @_;
-
-   $root->enable_hooks;
 
    $root->{resource} = [map $root->resource ("+$_"),
                             0 .. urxvt::NUM_RESOURCES - 1];
@@ -770,13 +809,13 @@ sub on_init {
       }
    }
 
-   $root->{bell_timeout}    = int($rs->text('bell-timeout') // 1);
-   $root->{new_button}      = $rs->bool('new-button', 0);
-   $root->{tab_title}       = $rs->bool('title', 1);
-   $root->{autohide}        = $rs->bool('autohide', 1);
-   $root->{no_default_keys} = $rs->bool('no-tabbedex-keys', 0);
-   $root->{reopen_on_close} = $rs->bool('reopen-on-close', 0);
-   $root->{new_tab_command} = $rs->text('new-tab-command', 'inherit');
+   $root->{bell_timeout}     = int($rs->text('bell-timeout') // 1);
+   $root->{new_button}       = $rs->bool('new-button', 0);
+   $root->{tab_title}        = $rs->bool('title', 1);
+   $root->{autohide}         = $rs->bool('autohide', 1);
+   $root->{register_keysyms} = !$rs->bool('no-tabbedex-keys', 0);
+   $root->{reopen_on_close}  = $rs->bool('reopen-on-close', 0);
+   $root->{new_tab_command}  = $rs->text('new-tab-command', 'inherit');
 
    my @blacklist = split(',', $rs->text('perl-ext-blacklist'));
    $root->{perl_ext_blacklist} =
@@ -789,10 +828,6 @@ sub on_init {
                                               [2, 0, 'title']);
    $root->{init_cmd} = "$colours_cmd\033[?25l";
    $root->{rs_colours} = $colours;
-
-   $root->register_keysyms;
-
-   ();
 }
 
 _on start => sub {
@@ -1056,23 +1091,22 @@ package urxvt::ext::tabbedex::tab;
 sub enable_hooks {
 	for my $hook (qw(start destroy user_command property_notify add_lines
 	                 bell osc_seq_perl)) {
-		my $name = "urxvt::ext::tabbedex::tab_$hook";
+		my $name = "urxvt::ext::tabbedex::root::tab_$hook";
 		$_[0]->enable($hook => sub {
-			unshift @_, $_[0]{term}{root};
+			unshift @_, $_[0]{root};
 			goto &$name;
 		});
 	};
 }
 
-sub on_init {
-	$_[0]->enable_hooks;
+sub init {
 	$_[0]{bell_ends} = 0;
 }
 
 
 sub index {
 	my ($tab) = @_;
-	my $tabs = $tab->{term}{root}{tabs};
+	my $tabs = $tab->{root}{tabs};
 	my $idx = 0;
 	++$idx while $tabs->[$idx] != $tab;
 	$idx;
@@ -1105,7 +1139,7 @@ sub finish_rename_tab {
 	delete $tab->{old_name};
 	$tab->disable('key_press');
 
-	$tab->{term}{root}->refresh;
+	$tab->{root}->refresh;
 }
 
 sub set_name {
@@ -1158,7 +1192,7 @@ sub _rename_tab_key_press {
 		return 1;
 	}
 
-	$tab->{term}{root}->refresh;
+	$tab->{root}->refresh;
 	1
 }
 
