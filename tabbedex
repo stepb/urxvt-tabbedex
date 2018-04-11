@@ -727,73 +727,6 @@ sub register_keysyms {
     }
 }
 
-{
-	package urxvt::ext::tabbedex::rs_reader;
-
-	sub new {
-		my ($class, $root) = @_;
-		my $prefix = $root->x_resource('tabbed.tabbedex-rs-prefix');
-		bless [$root, $prefix // 'tabbed', $root->{_name}], $class
-	}
-
-	sub text {
-		my ($rs, $name, $default) = @_;
-		my ($root, $prefix, $extname) = @$rs;
-		my $value = $root->x_resource("$prefix.$name");
-		if (defined $value && defined $extname &&
-		    $prefix ne $extname && $prefix ne '%') {
-			urxvt::warn("$extname: ‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.\n");
-			urxvt::warn("$extname: With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘$extname’), for example:\n");
-			urxvt::warn("$extname:     URxvt.$extname.$name: $value\n");
-			pop @$rs;
-		}
-		defined $value ? $root->locale_decode($value) : $default
-	}
-
-	sub bool {
-		my $value = $_[0]->text($_[1]);
-		defined $value ? $value !~ /^(?:false|0|no|off)$/i : $_[2];
-	}
-
-	sub colours {
-		my $rs = shift;
-
-		my (@suffix, %used) = ('-fg', '-bg');
-		for my $c (@_) {
-			for my $i (0, 1) {
-				my $value = $rs->text($c->[2] . $suffix[$i]);
-				if (defined $value) {
-					$value =~ s/\s+/ /g;
-					$value =~ s/^ | $//g;
-					if ($value =~ /^[-#a-zA-Z0-9 ]/) {
-						$c->[$i] = $value;
-					}
-				}
-				$used{$c->[$i]} = undef;
-			}
-		}
-
-		my ($i, $cmd) = (0, '');
-		for my $key (keys %used) {
-			if ($key =~ /^-?\d+$/ && -2 <= $key && $key <= 255) {
-				$used{$key} = $key + 2;
-			} else {
-				++$i while exists $used{$i};
-				$cmd .= ';' . $i . ';' . $key;
-				$used{$key} = $used{$i} = $i + 2;
-			}
-		}
-
-		my $default = urxvt::DEFAULT_RSTYLE;
-		for $i (0..$#_) {
-			my ($fg, $bg) = @{ $_[$i] };
-			$_[$i] = urxvt::SET_COLOR $default, $used{$fg}, $used{$bg};
-		}
-
-		(\@_, $cmd ? "\e]4$cmd\a" : '')
-	}
-}
-
 sub on_init {
    my ($root) = @_;
 
@@ -1216,6 +1149,74 @@ sub _rename_tab_key_press {
 
 	$tab->{term}{root}->refresh;
 	1
+}
+
+
+## Class for getting data from resources.  Most notably, it handles the
+## deprecated ‘tabbedex-rs-prefix’ resource and parsing of colours.
+package urxvt::ext::tabbedex::rs_reader;
+
+sub new {
+	my ($class, $root) = @_;
+	my $prefix = $root->x_resource('tabbed.tabbedex-rs-prefix');
+	bless [$root, $prefix // 'tabbed', $root->{_name}], $class
+}
+
+sub text {
+	my ($rs, $name, $default) = @_;
+	my ($root, $prefix, $extname) = @$rs;
+	my $value = $root->x_resource("$prefix.$name");
+	if (defined $value && defined $extname &&
+	    $prefix ne $extname && $prefix ne '%') {
+		urxvt::warn("$extname: ‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.\n");
+		urxvt::warn("$extname: With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘$extname’), for example:\n");
+		urxvt::warn("$extname:     URxvt.$extname.$name: $value\n");
+		pop @$rs;
+	}
+	defined $value ? $root->locale_decode($value) : $default
+}
+
+sub bool {
+	my $value = $_[0]->text($_[1]);
+	defined $value ? $value !~ /^(?:false|0|no|off)$/i : $_[2];
+}
+
+sub colours {
+	my $rs = shift;
+
+	my (@suffix, %used) = ('-fg', '-bg');
+	for my $c (@_) {
+		for my $i (0, 1) {
+			my $value = $rs->text($c->[2] . $suffix[$i]);
+			if (defined $value) {
+				$value =~ s/\s+/ /g;
+				$value =~ s/^ | $//g;
+				if ($value =~ /^[-#a-zA-Z0-9 ]/) {
+					$c->[$i] = $value;
+				}
+			}
+			$used{$c->[$i]} = undef;
+		}
+	}
+
+	my ($i, $cmd) = (0, '');
+	for my $key (keys %used) {
+		if ($key =~ /^-?\d+$/ && -2 <= $key && $key <= 255) {
+			$used{$key} = $key + 2;
+		} else {
+			++$i while exists $used{$i};
+			$cmd .= ';' . $i . ';' . $key;
+			$used{$key} = $used{$i} = $i + 2;
+		}
+	}
+
+	my $default = urxvt::DEFAULT_RSTYLE;
+	for $i (0..$#_) {
+		my ($fg, $bg) = @{ $_[$i] };
+		$_[$i] = urxvt::SET_COLOR $default, $used{$fg}, $used{$bg};
+	}
+
+	(\@_, $cmd ? "\e]4$cmd\a" : '')
 }
 
 
