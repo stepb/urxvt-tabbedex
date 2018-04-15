@@ -18,7 +18,8 @@ installed separately.  Installation is as simple as invoking:
 
     curl https://raw.githubusercontent.com/mina86/urxvt-tabbedex/master/install | sh
 
-or to install system-wide:
+or to install system-wide (even though frankly this hasn’t been tested
+well):
 
     curl https://raw.githubusercontent.com/mina86/urxvt-tabbedex/master/install | sudo sh
 
