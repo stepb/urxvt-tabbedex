@@ -57,21 +57,27 @@ Switches to the first through twelfth tab.
 
 =item B<Control-Left> and B<Control-right>
 
-Move current tab to the left or right.  Wraps around once on the first/last
+Move current tab to the left or right.  Wraps around on the first and last
 position.
 
 =item B<Shift-Up>
 
-Allows current tab to be renamed.  Start typing desired new name and press
-Return to confirm or Escape to cancel.
+Allows current tab to be renamed.  Tab bar is shown if it was hidden, current
+tab’s name (if nay) is cleared and cursor is displayed in its place.  Typing
+text renames the tab, backspace or Ctrl+H delete the last character, Escape or
+Ctrl+C aborts the rename operation and Enter accepts the new name.
 
 =back
 
+Note that those default key bindings can be disabled, using B<no-tabbedex-keys>
+resource (see below), and replaced with custom ones using urxvt's B<keysym>
+resource.
+
 =head1 CONFIGURATION
 
-The extension can be configured via X resources just like urxvt itself or other
-plugins.  The default, deprecated, behaviour is for tabbedex to use C<tabbed> as
-a resource name prefix, for example:
+The extension can be configured with X resources just like urxvt itself.  The
+default, deprecated, behaviour is for tabbedex to use C<tabbed> as a resource
+name prefix, for example:
 
     URxvt.tabbed.tabbar-fg: 4
     URxvt.tabbed.tabbar-bg: 0
@@ -89,13 +95,15 @@ This can be configured using a C<tabbedex-rs-prefix> resource, for example:
     URxvt.tabbedex.tabbar-fg: 5
     URxvt.tabbedex.tabbar-bg: 0
 
-However, future versions of the extensions will stop respecting the resource all
-together and will unconditionally use plugin name as the prefix.  This will
-bring it in line with how other urxvt perl extensions behave.
+B<However>, future versions of the extensions will I<stop> respecting the
+resource all together and will unconditionally use plugin name as the prefix.
+This will bring it in line with how other urxvt perl extensions behave.
 
-To avoid breakage, users should set C<tabbedex-rs-prefix> to percent sign and
-use name of the plugin as prefix for other resource names (just like in the
-example above).  tabbedex will issue a warning if it is not followed.
+To avoid breakage, users should set C<tabbedex-rs-prefix> to percent sign (as
+shown in the example above) and use name of the plugin as the prefix.  tabbedex
+will issue a warning if it is not followed.
+
+Tabbedex recognises the following resources:
 
 =over
 
@@ -104,6 +112,30 @@ example above).  tabbedex will issue a warning if it is not followed.
 If set (the default), the tab bar will be hidden unless there are at least two
 tabs open.  This is irrespective of whether C<NEW> button or tab's title is
 displayed.
+
+=item B<new-button>: I<boolean>
+
+If set, a C<NEW> button will be displayed on the left of the tab bar.  Clicking
+the button creates a new tab.  It is not displayed by default.
+
+=item B<tabbar-fg>: I<colour>
+
+=item B<tabbar-bg>: I<colour>
+
+Foreground and background colours of the tab bar.  (3, 0) by default which
+translates to brown/dark yellow on black background.
+
+Colours can be specified as: I<-2> meaning default foreground, I<-1> meaning
+default background, an integer between B<0> and B<255> specifying index in
+terminal' colour palette or any other string which X11 recognises as a colour.
+
+=item B<tab-fg>: I<colour>
+
+=item B<tab-bg>: I<colour>
+
+Foreground and background colours of the current tab on the tab bar.  (0, 1) by
+default which translates to black on red.  See B<tabbar-fg> for more
+documentation on how colours can be specified.
 
 =item B<bell-fg>: I<colour>
 
@@ -129,10 +161,18 @@ Time in seconds, one second by default, a bell is said to be ringing on current
 tab for after it was rung.  Setting this to zero essentially disables the
 B<bell-tab-(fg|bg)> styling of tabs.
 
-=item B<new-button>: I<boolean>
+=item B<title>: I<boolean>
 
-If set, a C<NEW> button will be displayed on the left of the tab bar.  Clicking
-the button creates a new tab.  It is not displayed by default.
+If set (the default), when tab bar is visible and there is enough space left,
+current tab's title will be displayed after the last tab.
+
+=item B<title-fg>: I<colour>
+
+=item B<title-bg>: I<colour>
+
+Foreground and background colours of the tab title.  (2, 0) by default which
+translates to green on black.  See B<tabbar-fg> for more documentation on how
+colours can be specified.
 
 =item B<new-tab-command>: I<string>
 
@@ -162,29 +202,31 @@ my-prog "argument with spaces"> will not work.
 =item B<no-tabbedex-keys>: I<boolean>
 
 If set, the default key bindings (described at the beginning of this document)
-are not initialised.  The mappings can be recreated using urxvt's support of
-a keysym.* resource.  For example, the following will recreate all the default
-key bindings:
+are not set up.  The mappings can be recreated using urxvt's B<keysym.*>
+resources.  For example, the following will recreate all the default key
+bindings:
 
-    URxvt.tabbed.no-tabbedex-keys: yes
-    URxvt.keysym.Shift-Left: perl:tabbedex:prev_tab
-    URxvt.keysym.Shift-Right: perl:tabbedex:next_tab
-    URxvt.keysym.Shift-Down: perl:tabbedex:new_tab
-    URxvt.keysym.Shift-Up: perl:tabbedex:rename_tab
-    URxvt.keysym.Control-Left: perl:tabbedex:move_tab_left
-    URxvt.keysym.Control-Right: perl:tabbedex:move_tab_right
-    URxvt.keysym.Meta-F1: perl:tabbedex:goto_tab_1
-    URxvt.keysym.Meta-F2: perl:tabbedex:goto_tab_2
-    URxvt.keysym.Meta-F3: perl:tabbedex:goto_tab_3
-    URxvt.keysym.Meta-F4: perl:tabbedex:goto_tab_4
-    URxvt.keysym.Meta-F5: perl:tabbedex:goto_tab_5
-    URxvt.keysym.Meta-F6: perl:tabbedex:goto_tab_6
-    URxvt.keysym.Meta-F7: perl:tabbedex:goto_tab_7
-    URxvt.keysym.Meta-F8: perl:tabbedex:goto_tab_8
-    URxvt.keysym.Meta-F9: perl:tabbedex:goto_tab_9
-    URxvt.keysym.Meta-F10: perl:tabbedex:goto_tab_10
-    URxvt.keysym.Meta-F11: perl:tabbedex:goto_tab_11
-    URxvt.keysym.Meta-F12: perl:tabbedex:goto_tab_12
+    URxvt.tabbedex.no-tabbedex-keys: yes
+    URxvt.keysym.Shift-Left:    tabbedex:prev_tab
+    URxvt.keysym.Shift-Right:   tabbedex:next_tab
+    URxvt.keysym.Shift-Down:    tabbedex:new_tab
+    URxvt.keysym.Shift-Up:      tabbedex:rename_tab
+    URxvt.keysym.Control-Left:  tabbedex:move_tab_left
+    URxvt.keysym.Control-Right: tabbedex:move_tab_right
+    URxvt.keysym.Meta-F1:       tabbedex:goto_tab_1
+    URxvt.keysym.Meta-F2:       tabbedex:goto_tab_2
+    URxvt.keysym.Meta-F3:       tabbedex:goto_tab_3
+    URxvt.keysym.Meta-F4:       tabbedex:goto_tab_4
+    URxvt.keysym.Meta-F5:       tabbedex:goto_tab_5
+    URxvt.keysym.Meta-F6:       tabbedex:goto_tab_6
+    URxvt.keysym.Meta-F7:       tabbedex:goto_tab_7
+    URxvt.keysym.Meta-F8:       tabbedex:goto_tab_8
+    URxvt.keysym.Meta-F9:       tabbedex:goto_tab_9
+    URxvt.keysym.Meta-F10:      tabbedex:goto_tab_10
+    URxvt.keysym.Meta-F11:      tabbedex:goto_tab_11
+    URxvt.keysym.Meta-F12:      tabbedex:goto_tab_12
+
+See I<ACTIONS AND USER COMMANDS> below for list of available actions.
 
 =item B<perl-ext-blacklist>: I<string>
 
@@ -194,25 +236,6 @@ terminals (tabs).  tabbedex plugin is implicitly added onto the list.
 =item B<reopen-on-close>: I<boolean>
 
 If set, whenever last tab is destroyed a new one will be created.
-
-=item B<tabbar-fg>: I<colour>
-
-=item B<tabbar-bg>: I<colour>
-
-Foreground and background colours of the tab bar.  (3, 0) by default which
-translates to brown/dark yellow on black background.
-
-Colours can be specified as: I<-2> meaning default foreground, I<-1> meaning
-default background, an integer between B<0> and B<255> specifying index in
-terminal' colour palette or any other string which X11 recognises as a colour.
-
-=item B<tab-fg>: I<colour>
-
-=item B<tab-bg>: I<colour>
-
-Foreground and background colours of the current tab on the tab bar.  (0, 1) by
-default which translates to black on red.  See B<tabbar-fg> for more
-documentation on how colours can be specified.
 
 =item B<tabbar-timeouts>: I<string>
 
@@ -229,23 +252,11 @@ where <timeout> is timeout in seconds and <character> is a single activity
 character.  If activity character is (, [, { or < it will be used as left
 activity mark and matching character will be used on the right side.
 
-=item B<title>: I<boolean>
-
-If set (the default), when tab bar is visible and there is enough space left,
-current tab's title will be displayed after the last tab.
-
-=item B<title-fg>: I<colour>
-
-=item B<title-bg>: I<colour>
-
-Foreground and background colours of the tab title.  (2, 0) by default which
-translates to green on black.  See B<tabbar-fg> for more documentation on how
-colours can be specified.
-
 =back
 
 Extension's behaviour is also influenced by some of URxvt's configuration
-options as well.  (See I<RESOURCES> in the L<urxvt(1)> manpage for more information about them).  The options include:
+options as well.  (See I<RESOURCES> in the L<urxvt(1)> manpage for more
+information about them).  The options include:
 
 =over
 
@@ -260,10 +271,19 @@ is set.
 
 =back
 
-=head1 USER COMMANDS
+=head1 ACTIONS AND USER COMMANDS
 
-tabbedex supports several user commands which can be used with
-B<URxvt.keysym>.I<keysym> resource as well as other places.  The commands are:
+tabbedex supports several actions which can be bound to keys with
+B<URxvt.keysym>.I<keysym> resource, for example:
+
+    URxvt.keysym.Control-t: tabbedex:new_tab
+
+which creates a key binding for I<Ctrl+T> to create a new tab.  Using the name
+of the extension as the prefix of the keysym binding is preferred but when
+running an ancient urxvt (as in anything prior to 9.21) an alternative
+B<perl:tabbedex> must be used instead.
+
+Supported actions are:
 
 =over
 
@@ -281,12 +301,16 @@ Moves the current tab left or right.
 
 =item B<goto_tab_>I<N>
 
-If I<N> is a positive integer, switches to the I<N>th tab.  If I<N> is
-a negative integer, switches to the I<N>th tab counting from the last one.
+If I<N> is a positive integer, switches to the I<N>th tab.  If I<N> is negative,
+switches to the -I<N>th tab counting from the last one.
 
 =item B<tabbedex:kill_tab>
 
 Kills/destroys current tab.
+
+=item B<tabbedex:rename_tab>
+
+Start renaming the tab.
 
 =back
 
@@ -344,27 +368,64 @@ sub on_init {
 	bless $self, "urxvt::ext::tabbedex::$type";
 
 	# And continue initialisation.
+	my $supports_action = enable_action_hooks($self, !defined $root);
 	$self->enable_hooks;
 	$self->init;
 	if ($root->{register_keysyms}) {
-		register_keysyms($self);
+		register_keysyms($self, $supports_action);
 	}
 
 	()
 }
 
 sub register_keysyms {
-	my ($self) = @_;
-	$self->parse_keysym('Shift-Left', 'perl:tabbedex:prev_tab');
-	$self->parse_keysym('Shift-Right', 'perl:tabbedex:next_tab');
-	$self->parse_keysym('Shift-Down', 'perl:tabbedex:new_tab');
-	$self->parse_keysym('Shift-Up', 'perl:tabbedex:rename_tab');
-	$self->parse_keysym('Control-Left', 'perl:tabbedex:move_tab_left');
-	$self->parse_keysym('Control-Right', 'perl:tabbedex:move_tab_right');
+	my ($self, $supports_action) = @_;
+	my $prefix = ($supports_action && $self->{_name}) || 'perl:tabbedex';
+	$self->parse_keysym('Shift-Left', $prefix . ':prev_tab');
+	$self->parse_keysym('Shift-Right', $prefix . ':next_tab');
+	$self->parse_keysym('Shift-Down', $prefix . ':new_tab');
+	$self->parse_keysym('Shift-Up', $prefix . ':rename_tab');
+	$self->parse_keysym('Control-Left', $prefix . ':move_tab_left');
+	$self->parse_keysym('Control-Right', $prefix . ':move_tab_right');
 	for my $num (1..12) {
 		$self->parse_keysym('Meta-F' . $num,
-				    'perl:tabbedex:goto_tab_' . $num);
+				    $prefix . ':goto_tab_' . $num);
 	}
+}
+
+# Install handlers for ‘action’ and ‘user_command’ hooks.  This subroutine means
+# that root and tab packages should not touch those hooks themselves.  This is
+# here mostly because ancient urxvt errors out when trying to define ‘action’
+# hook.  As I didn’t want to duplicate handling of that, I moved it here where
+# both packages are handled.  And since ‘user_command’ is closely related, why
+# not handle it here as well?  A µoptimisation is that whatever way an action
+# reaches the plugin, there’s just one hop till ‘tab_action’ is called.
+sub enable_action_hooks {
+	my ($self, $isroot) = @_;
+	$self->enable(user_command => $isroot ? sub {
+		if ($_[1] =~ s/^tabbedex://) {
+			splice @_, 1, 0, $_[0]{cur};
+			goto \&urxvt::ext::tabbedex::root::tab_action;
+		}
+	} : sub {
+		my ($tab, $cmd) = shift;
+		if ($_[1] =~ s/^tabbedex://) {
+			unshift @_, $_[0]{root};
+			goto \&urxvt::ext::tabbedex::root::tab_action;
+		}
+	});
+	# Guard against ancient urxvts which do not support ‘action’ hook.  We
+	# probably shouldn’t bother, but oh well…
+	eval {
+		$self->enable(action => $isroot ? sub {
+			splice @_, 1, 0, $_[0]{cur};
+			goto \&urxvt::ext::tabbedex::root::tab_action;
+		} : sub {
+			unshift @_, $_[0]{root};
+			goto \&urxvt::ext::tabbedex::root::tab_action;
+		});
+		1
+	} // 0
 }
 
 
@@ -988,50 +1049,35 @@ sub tab_add_lines {
 }
 
 
-_on user_command => sub {
-	my $root = shift;
-	unshift @_, $root, $root->{cur}, @_;
-	goto \&tab_user_command;
-};
-
-sub tab_user_command {
-  my ($root, $tab, $cmd) = @_;
-
-  if ($cmd eq 'tabbedex:new_tab') {
-    if (!$root->{cur}->is_being_renamed) {
-      $root->new_tab;
-    }
-  }
-  elsif ($cmd eq 'tabbedex:next_tab') {
-    $root->change_tab($tab, 1);
-  }
-  elsif ($cmd eq 'tabbedex:prev_tab') {
-    $root->change_tab($tab, -1);
-  }
-  elsif ($cmd eq 'tabbedex:move_tab_left') {
-    $root->move_tab($tab, -1);
-  }
-  elsif ($cmd eq 'tabbedex:move_tab_right') {
-    $root->move_tab($tab, 1);
-  }
-  elsif ($cmd =~ /^tabbedex:goto_tab_(-?\d+)$/) {
-    if ($1 != 0 && !$root->{cur}->is_being_renamed && @{ $root->{tabs} } > 1) {
-      my $idx = $1 > 0 ? ($1 - 1) : (@{ $root->{tabs} } + $1);
-      if ($idx >= 0 && $idx < @{ $root->{tabs} }) {
-        $root->make_current ($root->{tabs}[$idx]);
-      }
-    }
-  }
-  elsif ($cmd eq 'tabbedex:rename_tab') {
-    if ($tab == $root->{cur} && $tab->start_rename_tab) {
-      $root->refresh;
-    }
-  }
-  elsif ($cmd eq 'tabbedex:kill_tab') {
-    $tab->destroy;
-  }
-
-  ();
+sub tab_action {
+	my ($root, $tab, $cmd) = @_;
+	if ($cmd eq 'new_tab') {
+		if (!$root->{cur}->is_being_renamed) {
+			$root->new_tab;
+		}
+	} elsif ($cmd eq 'next_tab') {
+		$root->change_tab($tab, 1);
+	} elsif ($cmd eq 'prev_tab') {
+		$root->change_tab($tab, -1);
+	} elsif ($cmd eq 'move_tab_left') {
+		$root->move_tab($tab, -1);
+	} elsif ($cmd eq 'move_tab_right') {
+		$root->move_tab($tab, 1);
+	} elsif ($cmd =~ /^goto_tab[_:](-?\d+)$/) {
+		if ($1 != 0 && !$root->{cur}->is_being_renamed && @{ $root->{tabs} } > 1) {
+			my $idx = $1 > 0 ? ($1 - 1) : (@{ $root->{tabs} } + $1);
+			if ($idx >= 0 && $idx < @{ $root->{tabs} }) {
+				$root->make_current ($root->{tabs}[$idx]);
+			}
+		}
+	} elsif ($cmd eq 'rename_tab') {
+		if ($tab == $root->{cur} && $tab->start_rename_tab) {
+			$root->refresh;
+		}
+	} elsif ($cmd eq 'kill_tab') {
+		$tab->destroy;
+	}
+	()
 }
 
 sub change_tab {
@@ -1089,7 +1135,7 @@ package urxvt::ext::tabbedex::tab;
 
 
 sub enable_hooks {
-	for my $hook (qw(start destroy user_command property_notify add_lines
+	for my $hook (qw(start destroy property_notify add_lines
 	                 bell osc_seq_perl)) {
 		my $name = "urxvt::ext::tabbedex::root::tab_$hook";
 		$_[0]->enable($hook => sub {
