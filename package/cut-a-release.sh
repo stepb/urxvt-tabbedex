@@ -2,29 +2,6 @@
 
 set -eu
 
-noclobber=true
-patchlevel=
-tag=-a
-for arg; do
-	case "$arg" in
-	-t|--no-tag) tag= ;;
-	-s|--sign)   tag=-s ;;
-	-f|--force)  noclobber=false ;;
-	-p?*)        patchlevel=${arg#-?} ;;
-	*)
-		echo "$1: unknown flag" >&2
-		exit 1
-	esac
-	shift
-done
-
-version=$(git log -1 --format=%cd --date=format:%g.%-V%u)${patchlevel:+.$patchlevel}
-pkg=urxvt-tabbedex-$version
-
-out=${TMPDIR:-/tmp}/$pkg.tar.bz2
-experimental=o/experimental
-master=o/master
-
 if [ -z "$(which tput 2>/dev/null)" ]; then
 	setf() { true; }
 	bold=
@@ -35,17 +12,59 @@ else
 	sgr0=$(tput sgr0)
 fi
 
-if $noclobber && [ -e "$out" ]; then
-	echo "$(setf 4)Release file (‘${bold}$out$(setf 4)’) already exists, aborting${sgr0}" >&2
+die() {
+	echo "${0##*/}: $(setf 4)$*${sgr0}" >&2
 	exit 1
+}
+
+noclobber=true
+patchlevel=
+tag=-a
+dry=
+experimental=o/experimental
+master=o/master
+n=0
+while [ $# -gt 0 ]; do
+	case "$n:$1" in
+	?:-s|?:--sign)    tag=-s ;;
+	?:-f|?:--force)   noclobber=false ;;
+	?:-n|?:--dry-run) dry="echo >" ;;
+	?:-p?*)           patchlevel=${1#-?} ;;
+	0:?*)
+		master=$1
+		experimental=HEAD
+		n=1
+		;;
+	1:?*)
+		experimental=$1
+		n=2
+		;;
+	*)
+		die "unknown argument: $1"
+	esac
+	shift
+done
+
+version=$(git log -1 --format=%cd --date=format:%g.%-V%u)
+version=$version${patchlevel:+.$patchlevel}
+pkg=urxvt-tabbedex-$version
+
+out=${TMPDIR:-/tmp}/$pkg.tar.bz2
+
+git remote update o
+
+if ! git merge-base --is-ancestor "$master" "$experimental"; then
+	die "$master is not an ancestor of $experimental" >&2
+elif [ -z "$dry" ] && $noclobber && [ -e "$out" ]; then
+	die "Release file (‘${bold}$out$(setf 4)’) already exists, aborting" >&2
 fi
 
 echo "Creating release ${bold}urxvt-tabbedex $version${sgr0} from $master:"
-git log -n1 --pretty="format:    $(setf 6)%h  $(setf 3)%s${sgr0}"
+git log -n1 --pretty="format:    $(setf 6)%h  $(setf 3)%s${sgr0}" "$master"
 
-if [ -n "$tag" ]; then
-	git tag $tag "v$version" "$master"
-fi
+$dry git tag $tag "v$version" "$master"
+$dry git push o +"v$version:refs/tags/v$version" \
+     "$master:refs/heads/master" +"$experimental:refs/heads/experimental"
 
 tmp=$(mktemp -d)
 trap 'rm -r -- "$tmp"' 0
@@ -61,7 +80,12 @@ echo "$version" >$tmp/$pkg/.version
 cd -- "$tmp"
 echo
 setf 7
-tar jcvf "$out" --sort=name --owner=0 --group=0 --mode=a+rX "$pkg"
+dry_out=${dry:+/dev/null}
+tar jcvf "${dry_out:-$out}" --sort=name --owner=0 --group=0 --mode=a+rX "$pkg"
 echo "$sgr0"
 
-echo ">>  Release file saved to ${bold}$out${sgr0}  <<"
+if [ -z "$dry" ]; then
+	echo ">>  Release file saved to ${bold}$out${sgr0}  <<"
+else
+	echo ">>  Would save release file to ${bold}$out${sgr0}  <<"
+fi
