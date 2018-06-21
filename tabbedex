@@ -63,7 +63,7 @@ position.
 =item B<Shift-Up>
 
 Allows current tab to be renamed.  Tab bar is shown if it was hidden, current
-tab’s name (if nay) is cleared and cursor is displayed in its place.  Typing
+tab's name (if any) is cleared and cursor is displayed in its place.  Typing
 text renames the tab, backspace or Ctrl+H delete the last character, Escape or
 Ctrl+C aborts the rename operation and Enter accepts the new name.
 
