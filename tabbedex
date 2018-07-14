@@ -193,9 +193,7 @@ All other tabs will act as if the option was not provided.
 =item I<-e B<another command>>
 
 The initial tab will use the B<-e> switch provided on urxvt's command line (if
-any) while all other tabs will use switch specified by this setting.  Note that
-parsing of the resource simply splits words on white space so things like I<-e
-my-prog "argument with spaces"> will not work.
+any) while all other tabs will use switch specified by this setting.
 
 =back
 
@@ -333,6 +331,7 @@ Sets name of the current tab to I<name>.
 =cut
 
 use Scalar::Util;
+use Text::ParseWords;
 
 
 # An initialisation hook which is called in root/master and slave tabs.  It’s
@@ -912,17 +911,16 @@ _on start => sub {
 
    $root->new_tab;
 
-   if ($root->{new_tab_command} eq 'inherit') {
+   my $cmd = delete $root->{new_tab_command};
+   if ($cmd eq 'inherit') {
       # nop
-   } elsif ($root->{new_tab_command} eq 'clear') {
+   } elsif ($cmd eq 'clear') {
       $root->{argv} = [];
-   } elsif ($root->{new_tab_command} =~ /^-e\s/) {
-      $root->{argv} = [split /\s+/, $root->{new_tab_command}];
+   } elsif ($cmd =~ /^-e\s/) {
+      $root->{argv} = [Text::ParseWords::shellwords($cmd)];
    } else {
-      printf "tabbedex: unrecognised value of new-tab-command: '%s'\n",
-         $root->{new_tab_command};
+      printf "tabbedex: unrecognised value of new-tab-command: '%s'\n", $cmd;
    }
-   delete $root->{new_tab_command};
 
    if (defined $root->{timeouts}) {
       my $interval = ($root->{timeouts}[@{ $root->{timeouts} } - 1]->[0]);
