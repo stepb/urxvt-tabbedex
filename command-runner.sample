@@ -1,0 +1,111 @@
+#!/usr/bin/env perl
+
+=head1 NAME
+
+command-runner.sample - example script for use with tabbedex tab-arguments
+
+=head1 DESCRIPTION
+
+The tabbedex urxvt plugin has a B<tab-arguments> resource.  That resource
+defines arguments passed to each tab when it's started.  By taking advantage of
+percent-sign-interpolation this feature can be used to customise executed
+command based on criteria such as which tab is executed.
+
+This is an example script which can be used for that very purpose.  To make use
+of it copy it, make it executable and configure the B<@commands> list near the
+beginning of the file.  For example, if urxvt-tabbedex repository is located in
+B<~/.urxvt/tabbedex3, the following steps are a good start:
+
+    cd ~/.urxvt/tabbedex
+    cp -- command-runner.sample command-runner.pl
+    chmod 700 -- command-runner.pl
+    ${VISUAL:-${EDITOR:-/bin/vi}} command-runner.pl
+
+Once this is done, the B<tab-arguments> resource must be configured properly,
+e.g.:
+
+    URxvt.tabbedex.tab-arguments: \
+        -e %~/code/urxvt-tabbedex/command-runner.pl -n %n %e
+
+With this done, each time new tab is started, this script will be run which will
+allow what actual command is executed be configured.  See B<@commands> list near
+the beginning for some examples.
+
+=cut
+
+use warnings;
+use strict;
+
+
+##
+## Configure what commands to run in each subsequent tab.  Each entry specifies
+## application to execute when corresponding tab is created.  Once this list
+## runs out, command given with ‘-e’ switch or shell will be started.
+##
+my @commands = (
+	# First tab is shell
+	['bash'],
+	# Second tab is Emacs
+	['emacs', '-nw'],
+	# In third, let’s tail /var/log/syslog
+	['tail', '-f', '/var/log/syslog'],
+);
+
+## Whether ‘-e’ switch should be ignored when running command for tab other than
+## the first one.  If this is zero, if ‘-e’ is provided, the first tab will use
+## it (shifting when @commands list takes effect) and all tabs which fall past
+## @commands list will use it as well.  With this set to one, ‘-e’ switch will
+## only affect the first tab.
+my $ignore_e_at_the_end = 0;
+
+
+
+sub parse_args {
+	my ($n, $command);
+	while (@ARGV) {
+		my $arg = shift @ARGV;
+		if ($arg !~ /^-[ne]$/) {
+			die "$0: $arg: unknown argument\n";
+		} elsif (!@ARGV) {
+			die "$0: $arg requires an argument\n";
+		}
+		if ($arg eq '-n') {
+			$n = shift @ARGV;
+		} elsif ($arg eq '-e') {
+			$command = \@ARGV;
+			last;
+		}
+	}
+	($n, $command)
+}
+
+
+sub choose_command {
+	my ($n, $command) = @_;
+	if (!defined $n) {
+		# To choose command based on tab number we need ‘-n’ switch to
+		# be present.
+		warn "$0: -n switch not present, ignoring per-tab commands\n";
+		return $command;
+	}
+
+	if ($command) {
+		# If ‘-e’ was given, the first tab will use it and only second
+		# tab will use per-tab configuration.
+		if ($n == 0) {
+			return $command;
+		}
+		if ($ignore_e_at_the_end) {
+			undef $command;
+		}
+		--$n;
+	}
+
+	# Choose per-tab command or use whatever was given as ‘-e’.
+	$commands[$n] // $command
+}
+
+
+my @command = @{ choose_command(parse_args) // [$ENV{'SHELL'} // '/bin/sh'] };
+exec @command;
+die "$0: " . $command[0] . ": $!\n";

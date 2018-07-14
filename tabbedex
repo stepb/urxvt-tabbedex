@@ -174,28 +174,52 @@ Foreground and background colours of the tab title.  (2, 0) by default which
 translates to green on black.  See B<tabbar-fg> for more documentation on how
 colours can be specified.
 
-=item B<new-tab-command>: I<string>
+=item B<tab-arguments>: I<string>
 
-Specifies how urxvt's B<-e> switch affects tabs created by tabbedex.  The
-resource can have one of three values:
+Arguments passed when starting a slave tabs.  If not specified, I<-e B<command>>
+switch used when starting urxvt command is used (if any).  If specified, the
+value is first expanded (see below), then split into words using shell quoting
+rules and those are passed as arguments to slave terminals when they are
+started.
+
+This resource can be used to pass any arguments however doing so may have
+unintended consequences.  Options such as I<-bw> or I<-geometry> are especially
+problematic but others may cause issues as well.  Because of this, only I<-e
+B>command arguments>> is officially supported.
+
+The value is expanded by replacing two-character sequences starting with
+a percent sign as follows:
 
 =over
 
-=item I<inherit>
+=item I<%%>
 
-The default.  The B<-e> command will be used by all tabs created by tabbedex.
+Replaced by a literal percent sign.
 
-=item I<clear>
+=item I<%e>
 
-Only the initial tab will use the B<-e> switch provided on urxvt's command line.
-All other tabs will act as if the option was not provided.
+Replaced by properly quoted I<-e B<command>> arguments if they were given when
+urxvt was started or an empty string otherwise.  Note: if this sequence is not
+present anywhere in the value of the resource, I<-e> switch passed when running
+urxvt will be completely ignored.
 
-=item I<-e B<another command>>
+=item I<%n>
 
-The initial tab will use the B<-e> switch provided on urxvt's command line (if
-any) while all other tabs will use switch specified by this setting.
+Replaced by the total number of tabs opened during the lifetime of the
+extension.  Not to be confused with number of tabs currently open.  The counter
+starts at zero and always increments for each subsequent tab.
+
+=item I<%~>
+
+Replaced by a properly quoted value of HOME environment variable or I</> if it's
+not set.
 
 =back
+
+Unrecognised sequences are replaced with an empty string.
+
+See B<command-runner.sample> file distributed with this extension for some ideas
+how this resource can be used to start different commands in different tabs.
 
 =item B<no-tabbedex-keys>: I<boolean>
 
@@ -670,14 +694,58 @@ sub tab_term_init {
 	}
 }
 
+sub quote_words {
+	join ' ', map {
+		my $v = $_;
+		$v =~ s/'/'\\''/g;
+		"'$v'";
+	} @_
+}
+
+sub args_percent_substitution {
+	my ($root, $ch, $original_argv) = @_;
+	if ($ch eq '%') {
+		$ch
+	} elsif ($ch eq 'e') {
+		quote_words @{ $original_argv }
+	} elsif ($ch eq 'n') {
+		$root->{total_tabs_open} // 0
+	} elsif ($ch eq '~') {
+		exists $ENV{'HOME'} ? quote_words $ENV{'HOME'} : '/'
+	} else {
+		urxvt::warn('tabbedex: unrecognised substitution in value of ' .
+		            '‘tab-arguments’ resource: ‘%' . $ch .
+		            "’; will substitute with empty string\n");
+		''
+	}
+}
+
 sub new_tab {
 	my ($root) = @_;
+
+	my $args = $root->{tab_arguments};
+	$args =~ s/^\s+|\s+$//g;
+	if ($args eq '' || $args eq '%e') {
+		$args = $root->{argv};
+	} else {
+		$args =~ s/%(.)/
+			$root->args_percent_substitution($1, $root->{argv})
+		/ge;
+		if (defined Text::ParseWords::shellwords($args)) {
+			$args = [Text::ParseWords::shellwords($args)];
+		} else {
+			urxvt::warn('tabbedex: error parsing ‘tab-arguments’ ' .
+		            'value: ‘' . $args . "’; ignoring\n");
+			$args = $root->{argv};
+		}
+	}
+
 	push @urxvt::TERM_INIT, sub { $root->tab_term_init($_[0]) };
 	push @urxvt::TERM_EXT, urxvt::ext::tabbedex::;
 	new urxvt::term
 		$root->env, $urxvt::RXVTNAME,
 		-embed => $root->parent,
-		@{ $root->{argv} }
+		@{ $args }
 }
 
 
@@ -874,7 +942,12 @@ sub init {
    $root->{autohide}         = $rs->bool('autohide', 1);
    $root->{register_keysyms} = !$rs->bool('no-tabbedex-keys', 0);
    $root->{reopen_on_close}  = $rs->bool('reopen-on-close', 0);
-   $root->{new_tab_command}  = $rs->text('new-tab-command', 'inherit');
+   $root->{tab_arguments}    = $rs->text('tab-arguments', '');
+
+   if ($rs->text('new-tab-command')) {
+      urxvt::warn('tabbedex: ‘new-tab-command’ resource is no longer ' .
+                  "recognised; use ‘tab-arguments’ instead\n");
+   }
 
    if (my $blacklist = $rs->text('perl-ext-blacklist')) {
        $blacklist =~ s/,/,-/;
@@ -911,17 +984,6 @@ _on start => sub {
 
    $root->new_tab;
 
-   my $cmd = delete $root->{new_tab_command};
-   if ($cmd eq 'inherit') {
-      # nop
-   } elsif ($cmd eq 'clear') {
-      $root->{argv} = [];
-   } elsif ($cmd =~ /^-e\s/) {
-      $root->{argv} = [Text::ParseWords::shellwords($cmd)];
-   } else {
-      printf "tabbedex: unrecognised value of new-tab-command: '%s'\n", $cmd;
-   }
-
    if (defined $root->{timeouts}) {
       my $interval = ($root->{timeouts}[@{ $root->{timeouts} } - 1]->[0]);
       $interval = int($interval / 4);
@@ -957,6 +1019,7 @@ sub tab_start {
 	my ($root, $tab) = @_;
 	$tab->XChangeInput ($tab->parent, urxvt::PropertyChangeMask);
 	push @{ $root->{tabs} }, $tab;
+	++$root->{total_tabs_open};
 	$root->make_current($tab);
 	();
 }
