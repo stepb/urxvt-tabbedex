@@ -31,17 +31,25 @@ With this done, each time new tab is started, this script will be run which will
 allow what actual command is executed be configured.  See B<@commands> list near
 the beginning for some examples.
 
+=head1 CONFIGURATION
+
+The script can be configured via B<@commands> and B<$ignore_e_at_the_end>
+variables.
+
 =cut
 
 use warnings;
 use strict;
 
 
-##
-## Configure what commands to run in each subsequent tab.  Each entry specifies
-## application to execute when corresponding tab is created.  Once this list
-## runs out, command given with ‘-e’ switch or shell will be started.
-##
+=head2 @commands
+
+Configure what commands to run in each subsequent tab.  Each entry specifies
+application to execute when corresponding tab is created.  Once this list runs
+out, command given with I<-e> switch or shell will be started.
+
+=cut
+
 my @commands = (
 	# First tab is shell
 	['bash'],
@@ -51,37 +59,37 @@ my @commands = (
 	['tail', '-f', '/var/log/syslog'],
 );
 
-## Whether ‘-e’ switch should be ignored when running command for tab other than
-## the first one.  If this is zero, if ‘-e’ is provided, the first tab will use
-## it (shifting when @commands list takes effect) and all tabs which fall past
-## @commands list will use it as well.  With this set to one, ‘-e’ switch will
-## only affect the first tab.
+=head2 $ignore_e_at_the_end
+
+Whether I<-e> switch should be ignored when running command for tab other than
+the first one.  If this is zero, if I<-e> is provided, the first tab will use it
+(shifting when B<@commands> list takes effect) and all tabs which fall past
+B<@commands> list will use it as well.  With this set to one, I<-e> switch will
+only affect the first tab.
+
+=cut
+
 my $ignore_e_at_the_end = 0;
 
 
 
-sub parse_args {
-	my ($n, $command);
-	while (@ARGV) {
-		my $arg = shift @ARGV;
-		if ($arg !~ /^-[ne]$/) {
-			die "$0: $arg: unknown argument\n";
-		} elsif (!@ARGV) {
-			die "$0: $arg requires an argument\n";
-		}
-		if ($arg eq '-n') {
-			$n = shift @ARGV;
-		} elsif ($arg eq '-e') {
-			$command = \@ARGV;
-			last;
-		}
+my ($n, $command);
+while (@ARGV) {
+	my $arg = shift @ARGV;
+	if ($arg !~ /^-[ne]$/) {
+		die "$0: $arg: unknown argument\n";
+	} elsif (!@ARGV) {
+		die "$0: $arg requires an argument\n";
 	}
-	($n, $command)
+	if ($arg eq '-n') {
+		$n = shift @ARGV;
+	} elsif ($arg eq '-e') {
+		$command = \@ARGV;
+		last;
+	}
 }
 
-
-sub choose_command {
-	my ($n, $command) = @_;
+$command = eval {
 	if (!defined $n) {
 		# To choose command based on tab number we need ‘-n’ switch to
 		# be present.
@@ -102,10 +110,8 @@ sub choose_command {
 	}
 
 	# Choose per-tab command or use whatever was given as ‘-e’.
-	$commands[$n] // $command
-}
+	return $commands[$n] // $command;
+} // [$ENV{'SHELL'} // '/bin/sh'];
 
-
-my @command = @{ choose_command(parse_args) // [$ENV{'SHELL'} // '/bin/sh'] };
-exec @command;
-die "$0: " . $command[0] . ": $!\n";
+exec @{ $command };
+die "$0: " . $command->[0] . ": $!\n";
