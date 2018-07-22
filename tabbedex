@@ -209,6 +209,15 @@ Replaced by the total number of tabs opened during the lifetime of the
 extension.  Not to be confused with number of tabs currently open.  The counter
 starts at zero and always increments for each subsequent tab.
 
+=item I<%p>
+
+Replaced by ID of a process group which is running in foreground of the pseudo
+terminal in the current tab (as in, not the new tab being created but the tab
+where the new tab request originated from) or -1 if there are no active tabs (or
+that information could not be determined).
+
+This can be used to guess the current working directory of current tab.
+
 =item I<%~>
 
 Replaced by a properly quoted value of HOME environment variable or I</> if it's
@@ -219,7 +228,9 @@ not set.
 Unrecognised sequences are replaced with an empty string.
 
 See B<command-runner.sample> file distributed with this extension for some ideas
-how this resource can be used to start different commands in different tabs.
+how this resource can be used to start different commands in different tabs or
+how to use the same current working directory for new tabs as the active tab
+has.
 
 =item B<no-tabbedex-keys>: I<boolean>
 
@@ -703,11 +714,13 @@ sub quote_words {
 }
 
 sub args_percent_substitution {
-	my ($root, $ch, $original_argv) = @_;
+	my ($root, $ch, $original_argv, $tab) = @_;
 	if ($ch eq '%') {
 		$ch
 	} elsif ($ch eq 'e') {
 		quote_words @{ $original_argv }
+	} elsif ($ch eq 'p') {
+		$tab ? $tab->foreground_pgid : -1
 	} elsif ($ch eq 'n') {
 		$root->{total_tabs_open} // 0
 	} elsif ($ch eq '~') {
@@ -721,7 +734,7 @@ sub args_percent_substitution {
 }
 
 sub new_tab {
-	my ($root) = @_;
+	my ($root, $tab) = @_;
 
 	my $args = $root->{tab_arguments};
 	$args =~ s/^\s+|\s+$//g;
@@ -729,7 +742,7 @@ sub new_tab {
 		$args = $root->{argv};
 	} else {
 		$args =~ s/%(.)/
-			$root->args_percent_substitution($1, $root->{argv})
+			$root->args_percent_substitution($1, $root->{argv}, $tab)
 		/ge;
 		if (defined Text::ParseWords::shellwords($args)) {
 			$args = [Text::ParseWords::shellwords($args)];
@@ -898,7 +911,7 @@ _on button_release => sub {
 		} elsif ($col >= $button->[1]) {
 			# nop
 		} elsif ($button->[2] == -1) {
-			$root->new_tab;
+			$root->new_tab($root->{cur});
 		} else {
 			$root->make_current($root->{tabs}[$button->[2]]);
 		}
@@ -1114,7 +1127,7 @@ sub tab_action {
 	my ($root, $tab, $cmd) = @_;
 	if ($cmd eq 'new_tab') {
 		if (!$root->{cur}->is_being_renamed) {
-			$root->new_tab;
+			$root->new_tab($tab);
 		}
 	} elsif ($cmd eq 'next_tab') {
 		$root->change_tab($tab, 1);
@@ -1191,6 +1204,8 @@ sub tab_osc_seq_perl {
 
 package urxvt::ext::tabbedex::tab;
 
+use POSIX qw/tcgetpgrp/;
+
 # helper extension implementing the subwindows of a tabbed terminal.
 # simply proxies all interesting calls back to the tabbedex class.
 
@@ -1217,6 +1232,12 @@ sub index {
 	my $idx = 0;
 	++$idx while $tabs->[$idx] != $tab;
 	$idx;
+}
+
+
+sub foreground_pgid {
+	my $n = $_[0]->pty_fd;
+	$n < 0 || ($n = tcgetpgrp($n)) < 0 ? -1 : $n
 }
 
 

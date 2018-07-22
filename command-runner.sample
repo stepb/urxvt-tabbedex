@@ -9,7 +9,7 @@ command-runner.sample - example script for use with tabbedex tab-arguments
 
 =head1 SYNOPSIS
 
-command-runner.sample B<-n> I<num> [ B<-e> I<command> [ I<args> ]]
+command-runner.sample [ B<-n> I<num> ] [ B<-p> I<pgid> ] [ B<-e> I<command> [ I<args> ]]
 
 =head1 DESCRIPTION
 
@@ -38,6 +38,20 @@ With this done, each time new tab is started, this script will be run which will
 allow what actual command is executed be configured.  See B<@commands> list near
 the beginning for some examples.
 
+The script also accepts I<-p> argument.  If given, the script will attempt to
+detect working directory of process in process group specified by the argument
+and change to it before executing the command.  To take advantage of this switch
+the B<tab-arguments> resource needs to include B<%p> sequence as in:
+
+    URxvt.tabbedex.tab-arguments: \
+        -e %~/code/urxvt-tabbedex/command-runner.pl -n %n -p %p %e
+
+Note that current working directory detection is rather fragile and may fail or
+give unexpected results.  If the process run as a different user, current user
+may be unable to determine the path (or not have access to it).  There may be
+multiple processes in the foreground each having different current working
+directory.  And this method does not follow remote connections such as SSH.
+
 =head1 CONFIGURATION
 
 The script can be configured via B<@commands> list.  Each entry of the array
@@ -51,6 +65,8 @@ numbering of B<@commands> entries will be shifted by one.
 
 Entries of the list must be array references.  If you're unfamiliar with Perl,
 just surrounded each entry by square brackets and you'll be good. :)
+
+The list can be made empty to disable this particular feature of the script.
 
 =cut
 
@@ -66,6 +82,7 @@ my @commands = (
 
 sub error {
 	my $msg = join ': ', @_;
+	chomp $msg;
 	print STDERR "$0: $msg\n";
 }
 
@@ -76,32 +93,98 @@ sub fatal {
 	exit 1;
 }
 
-my ($n, $command);
+my ($n, $p, $command);
 while (@ARGV) {
 	my $arg = shift @ARGV;
-	if ($arg !~ /^-[ne]$/) {
+	if ($arg !~ /^-[pne]$/) {
 		fatal $arg, 'unknown argument';
 	} elsif (!@ARGV) {
 		fatal $arg, 'requires an argument';
 	}
 	if ($arg eq '-n') {
 		$n = shift @ARGV;
+	} elsif ($arg eq '-p') {
+		$p = shift @ARGV;
 	} elsif ($arg eq '-e') {
 		$command = \@ARGV;
 		last;
 	}
 }
 
-if (defined $n) {
+sub try_cwd_of_group {
+	my ($pgid) = @_;
+
+	if (!-d '/proc') {
+		error '/proc missing; ignoring -p switch';
+		return;
+	}
+
+	my @errors;
+	my $try = sub {
+		my ($pid) = @_;
+		my $path = "/proc/$pid/cwd";
+		my $cwd = eval { readlink $path };
+		if ($@) {
+			push @errors, "$path: $@";
+		} elsif (!defined $cwd) {
+			push @errors, "$path: $!";
+		} elsif (!chdir $cwd) {
+			push @errors, "$cwd: $!";
+		} else {
+			return 1;
+		}
+		0
+	};
+
+	  # If $pgid is still alive we can use its CWD
+	if (-d "/proc/$pgid" && $try->($pgid)) {
+		return;
+	}
+
+	# If $pgid is no longer with us, we need to go through all running
+	# processes and filter the ones which are in process group $pgid.
+	if (opendir(my $dir, '/proc')) {
+		while (my $pid = readdir $dir) {
+			if ($pid =~ /^[0-9]+$/ && $pid != $pgid &&
+			    open(my $fh, '<', "/proc/$pid/stat")) {
+				if ($pgid == (split ' ', scalar <$fh>)[4] &&
+				    $try->($pid)) {
+					return;
+				}
+			}
+		}
+	} else {
+		push @errors, "/proc: $!";
+	}
+
+	for (@errors) {
+		error $_;
+	}
+	error("can't find " . (@errors ? 'CWD of' : 'process in') .
+	      " group $pgid; won't change directory");
+}
+
+if (defined $p) {
+	if ($p >= 0) {
+		try_cwd_of_group $p;
+	}
+} elsif (!defined $n) {
+	error 'neither -n nor -p given, this script won’t add anything useful';
+}
+
+if (defined $n && @commands) {
 	if ($command) {
 		# If ‘-e’ was given, the first tab will use it and only second
 		# tab will use per-tab configuration.
 		--$n;
 	}
+
 	if ($n >= 0) {
 		$command = $commands[$n] // $command;
 	}
-} else {
+} elsif (defined $n) {
+	error 'no per-tab commands configured, ignoring -n switch';
+} elsif (@commands) {
 	error '-n switch not present, ignoring per-tab commands';
 }
 
