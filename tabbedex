@@ -320,9 +320,17 @@ Supported actions are:
 
 =over
 
-=item B<tabbedex:new_tab>
+=item B<tabbedex:new_tab> or B<tabbedex:new_tab:I<arguments>>
 
-Creates a new tab.
+Creates a new tab.  In the second form, I<arguments> temporarily override value
+of the B<tab-arguments> resource.  This makes it possible to create bindings
+which start particular commands, for example:
+
+    URxvt.keysym.F1:    tabbedex:new_tab:-e info
+
+makes it such that pressing F1 will open a new tab running B<info> command.
+(Remember that I<arguments> are passed as arguments to urxvt so to run a command
+B<-e> is required as in example above).
 
 =item B<tabbedex:next_tab> and B<tabbedex:prev_tab>
 
@@ -734,9 +742,11 @@ sub args_percent_substitution {
 }
 
 sub new_tab {
-	my ($root, $tab) = @_;
+	my ($root, $tab, $args) = @_;
 
-	my $args = $root->{tab_arguments};
+	if (!defined $args) {
+		$args = $root->{tab_arguments};
+	}
 	$args =~ s/^\s+|\s+$//g;
 	if ($args eq '' || $args eq '%e') {
 		$args = $root->{argv};
@@ -1125,9 +1135,9 @@ sub tab_add_lines {
 
 sub tab_action {
 	my ($root, $tab, $cmd) = @_;
-	if ($cmd eq 'new_tab') {
+	if ($cmd =~ /^new_tab(?::(.*))?$/) {
 		if (!$root->{cur}->is_being_renamed) {
-			$root->new_tab($tab);
+			$root->new_tab($tab, $1);
 		}
 	} elsif ($cmd eq 'next_tab') {
 		$root->change_tab($tab, 1);
