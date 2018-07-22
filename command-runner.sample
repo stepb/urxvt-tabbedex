@@ -9,7 +9,7 @@ command-runner.sample - example script for use with tabbedex tab-arguments
 
 =head1 SYNOPSIS
 
-command-runner.sample [ B<-n> I<num> ] [ B<-p> I<pgid> ] [ B<-e> I<command> [ I<args> ]]
+command-runner.sample [ -v ] [ B<-n> I<num> ] [ B<-p> I<pgid> ] [ B<-e> I<command> [ I<args> ]]
 
 =head1 DESCRIPTION
 
@@ -32,7 +32,7 @@ Once this is done, the B<tab-arguments> resource must be configured properly,
 e.g.:
 
     URxvt.tabbedex.tab-arguments: \
-        -e %~/code/urxvt-tabbedex/command-runner.pl -n %n %e
+        -e %~/code/urxvt-tabbedex/command-runner.pl -v -n %n %e
 
 With this done, each time new tab is started, this script will be run which will
 allow what actual command is executed be configured.  See B<@commands> list near
@@ -44,13 +44,15 @@ and change to it before executing the command.  To take advantage of this switch
 the B<tab-arguments> resource needs to include B<%p> sequence as in:
 
     URxvt.tabbedex.tab-arguments: \
-        -e %~/code/urxvt-tabbedex/command-runner.pl -n %n -p %p %e
+        -e %~/code/urxvt-tabbedex/command-runner.pl -v -n %n -p %p %e
 
 Note that current working directory detection is rather fragile and may fail or
 give unexpected results.  If the process run as a different user, current user
 may be unable to determine the path (or not have access to it).  There may be
 multiple processes in the foreground each having different current working
 directory.  And this method does not follow remote connections such as SSH.
+
+Lastly, to make the script less noisy, remove the B<-v> switch.
 
 =head1 CONFIGURATION
 
@@ -80,13 +82,18 @@ my @commands = (
 );
 
 
+my $v;
+
 sub error {
-	my $msg = join ': ', @_;
-	chomp $msg;
-	print STDERR "$0: $msg\n";
+	if ($v) {
+		my $msg = join ': ', @_;
+		chomp $msg;
+		print STDERR "$0: $msg\n";
+	}
 }
 
 sub fatal {
+	$v = 1;
 	error @_;
 	error 'use Ctrl+C to terminate this script';
 	sleep;
@@ -96,7 +103,9 @@ sub fatal {
 my ($n, $p, $command);
 while (@ARGV) {
 	my $arg = shift @ARGV;
-	if ($arg !~ /^-[pne]$/) {
+	if ($arg eq '-v') {
+		$v = 1;
+	} elsif ($arg !~ /^-[pne]$/) {
 		fatal $arg, 'unknown argument';
 	} elsif (!@ARGV) {
 		fatal $arg, 'requires an argument';
