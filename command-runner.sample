@@ -72,14 +72,26 @@ only affect the first tab.
 my $ignore_e_at_the_end = 0;
 
 
+sub error {
+	my $msg = join ': ', @_;
+	print STDERR "$0: $msg\n";
+}
+
+sub fatal {
+	error @_;
+	error 'use Ctrl+C to terminate this script';
+	sleep;
+	exit 1;
+}
+
 
 my ($n, $command);
 while (@ARGV) {
 	my $arg = shift @ARGV;
 	if ($arg !~ /^-[ne]$/) {
-		die "$0: $arg: unknown argument\n";
+		fatal $arg, 'unknown argument';
 	} elsif (!@ARGV) {
-		die "$0: $arg requires an argument\n";
+		fatal $arg, 'requires an argument';
 	}
 	if ($arg eq '-n') {
 		$n = shift @ARGV;
@@ -93,7 +105,7 @@ $command = eval {
 	if (!defined $n) {
 		# To choose command based on tab number we need ‘-n’ switch to
 		# be present.
-		warn "$0: -n switch not present, ignoring per-tab commands\n";
+		error '-n switch not present, ignoring per-tab commands';
 		return $command;
 	}
 
@@ -113,5 +125,5 @@ $command = eval {
 	return $commands[$n] // $command;
 } // [$ENV{'SHELL'} // '/bin/sh'];
 
-exec @{ $command };
-die "$0: " . $command->[0] . ": $!\n";
+my $prog = $command->[0];
+exec $prog @{ $command } or fatal $prog, "$!";
