@@ -199,9 +199,22 @@ Replaced by a literal percent sign.
 =item I<%e>
 
 Replaced by properly quoted I<-e B<command>> arguments if they were given when
-urxvt was started or an empty string otherwise.  Note: if this sequence is not
-present anywhere in the value of the resource, I<-e> switch passed when running
-urxvt will be completely ignored.
+urxvt was started or an empty string otherwise.  See also I<%E> which may be
+easier for some uses.
+
+Note: if neither I<%e> nor I<%E> is present value of the resource, I<-e> switch
+passed when running urxvt will be completely ignored.
+
+=item I<%E>
+
+Similar to I<%e> but I<-e> is not included in the expansion and if I<%e> would
+expand to an empty string <%E> expands to value of SHELL environment variable or
+I</bin/sh> if that's empty.  This means that <%E> is always a valid command.
+
+For example, here's how the sequence can be used to set TABBEDEX_NUM environment
+variables when running a command:
+
+    URxvt.tabbedex.tab-arguments: -e /usr/bin/env TABBEDEX_NUM=%n %E
 
 =item I<%n>
 
@@ -722,11 +735,15 @@ sub quote_words {
 }
 
 sub args_percent_substitution {
-	my ($root, $ch, $original_argv, $tab) = @_;
+	my ($root, $ch, $tab) = @_;
 	if ($ch eq '%') {
 		$ch
 	} elsif ($ch eq 'e') {
-		quote_words @{ $original_argv }
+		quote_words @{ $root->{argv} }
+	} elsif ($ch eq 'E') {
+		quote_words @{ $root->{argv} }
+			? @{ $root->{argv} }[1..$#$root->{argv}]
+			: ($ENV{SHELL} || '/bin/sh')
 	} elsif ($ch eq 'p') {
 		$tab ? $tab->foreground_pgid : -1
 	} elsif ($ch eq 'n') {
@@ -752,7 +769,7 @@ sub new_tab {
 		$args = $root->{argv};
 	} else {
 		$args =~ s/%(.)/
-			$root->args_percent_substitution($1, $root->{argv}, $tab)
+			$root->args_percent_substitution($1, $tab)
 		/ge;
 		if (defined Text::ParseWords::shellwords($args)) {
 			$args = [Text::ParseWords::shellwords($args)];
