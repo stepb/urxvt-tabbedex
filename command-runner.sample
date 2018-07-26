@@ -1,76 +1,73 @@
 #!/usr/bin/env perl
 
-use warnings;
-use strict;
-
 =head1 NAME
 
 command-runner.sample - example script for use with tabbedex tab-arguments
 
 =head1 SYNOPSIS
 
-command-runner.sample [ -v ] [ B<-n> I<num> ] [ B<-p> I<pgid> ] [ B<-e> I<command> [ I<args> ]]
+command-runner.sample I<num> [ B<-e> I<command> [ I<args> ... ]]
 
 =head1 DESCRIPTION
 
-The tabbedex urxvt plugin has a B<tab-arguments> resource.  That resource
-defines arguments passed to each tab when it's started.  By taking advantage of
-percent-sign-interpolation this feature can be used to customise executed
-command based on criteria such as which tab is executed.
+Runs one of predefined commands, command given on command line or starts
+a shell.  A list of command is specified in the source code of this script (see
+B<@commands> list) and if B<-e> switch is not given the script will start
+command at index I<num> or shell.  If B<-e> switch is given, I<num> indexing is
+shifted by one as if I<command> was the first entry in predefined list.
 
-This is an example script which can be used for that very purpose.  To make use
-of it copy it, make it executable and configure the B<@commands> list near the
-beginning of the file.  For example, if urxvt-tabbedex repository is located in
-B<~/.urxvt/tabbedex>, the following steps are a good start:
+=head1 OPTIONS
 
-    cd ~/.urxvt/tabbedex
-    cp -- command-runner.sample command-runner.pl
-    chmod 700 -- command-runner.pl
-    ${VISUAL:-${EDITOR:-/bin/vi}} command-runner.pl
+=over
+
+=item I<num>
+
+Non-negative index of the predefined command to execute.  If B<-e> switch is not
+given, this is zero-indexed; if B<-e> switch is given, zero means to execute
+command given by B<-e> and predefined commands become indexed starting from one.
+
+=item B<-e> I<command> [ I<args> ... ]
+
+If given, command to execute when I<num> is zero or goes past the list of
+predefined commands.
+
+=back
+
+=head1 TABBEDEX
+
+The script was designed to work with tabbedex urxvt plugin and in particular its
+B<tab-arguments> configuration resource.  It can be used to start different
+commands in different subsequent tabs.  To make use of it copy it, make it
+executable and change the B<@commands> list near the beginning of the file.  For
+example, if urxvt-tabbedex is installed to B</usr/lib/urxvt>, the following
+steps are a good start:
+
+    mkdir -p ~/.urxvt
+    cp /usr/lib/urxvt/tabbedex-command-runner.sample \
+       ~/.urxvt/command-runner.pl
+    chmod 700 -- ~/.urxvt/command-runner.pl
+    ${VISUAL:-${EDITOR:-/bin/vi}} ~/.urxvt/command-runner.pl
 
 Once this is done, the B<tab-arguments> resource must be configured properly,
 e.g.:
 
     URxvt.tabbedex.tab-arguments: \
-        -e %~/code/urxvt-tabbedex/command-runner.pl -v -n %n %e
+        -e %~/.urxvt/command-runner.pl %n %e
 
 With this done, each time new tab is started, this script will be run which will
 allow what actual command is executed be configured.  See B<@commands> list near
 the beginning for some examples.
 
-The script also accepts I<-p> argument.  If given, the script will attempt to
-detect working directory of process in process group specified by the argument
-and change to it before executing the command.  To take advantage of this switch
-the B<tab-arguments> resource needs to include B<%p> sequence as in:
+To use this script with B<pgid-cd.pl> the resource becomes:
 
     URxvt.tabbedex.tab-arguments: \
-        -e %~/code/urxvt-tabbedex/command-runner.pl -v -n %n -p %p %e
-
-Note that current working directory detection is rather fragile and may fail or
-give unexpected results.  If the process run as a different user, current user
-may be unable to determine the path (or not have access to it).  There may be
-multiple processes in the foreground each having different current working
-directory.  And this method does not follow remote connections such as SSH.
-
-Lastly, to make the script less noisy, remove the B<-v> switch.
-
-=head1 CONFIGURATION
-
-The script can be configured via B<@commands> list.  Each entry of the array
-determines the command to be run in each subsequent tab.  Once this list runs
-out, command given with B<-e> switch (or shell) will be started.
-
-For example, if the first entry is B<['emacs', '-nw']> and the script is run
-with B<-n 0> (and without B<-e>) it will execute Emacs.  If B<-e> is given,
-application specified by the switch will be run when B<-n 0> was passed and
-numbering of B<@commands> entries will be shifted by one.
-
-Entries of the list must be array references.  If you're unfamiliar with Perl,
-just surrounded each entry by square brackets and you'll be good. :)
-
-The list can be made empty to disable this particular feature of the script.
+        -e /usr/lib/urxvt/tabbadex-pgid-cd %p \
+        %~/.urxvt/command-runner.pl %n %e
 
 =cut
+
+use warnings;
+use strict;
 
 my @commands = (
 	# First tab is shell
@@ -81,122 +78,41 @@ my @commands = (
 	[qw(tail -f /var/log/syslog)],
 );
 
-
-my $v;
-
 sub error {
-	if ($v) {
-		my $msg = join ': ', @_;
-		chomp $msg;
-		print STDERR "$0: $msg\n";
-	}
+	print STDERR join(': ', $0, @_), "\n";
 }
 
 sub fatal {
-	$v = 1;
 	error @_;
 	error 'use Ctrl+C to terminate this script';
 	sleep;
 	exit 1;
 }
 
-my ($n, $p, $command);
-while (@ARGV) {
-	my $arg = shift @ARGV;
-	if ($arg eq '-v') {
-		$v = 1;
-	} elsif ($arg !~ /^-[pne]$/) {
-		fatal $arg, 'unknown argument';
-	} elsif (!@ARGV) {
-		fatal $arg, 'requires an argument';
-	}
-	if ($arg eq '-n') {
-		$n = shift @ARGV;
-	} elsif ($arg eq '-p') {
-		$p = shift @ARGV;
-	} elsif ($arg eq '-e') {
-		$command = \@ARGV;
-		last;
-	}
+my $num = shift @ARGV;
+if ($num !~ /^\d+$/) {
+	fatal 'non-negative integer expected as first argument'
 }
 
-sub try_cwd_of_group {
-	my ($pgid) = @_;
-
-	if (!-d '/proc') {
-		error '/proc missing; ignoring -p switch';
-		return;
-	}
-
-	my @errors;
-	my $try = sub {
-		my ($pid) = @_;
-		my $path = "/proc/$pid/cwd";
-		my $cwd = eval { readlink $path };
-		if ($@) {
-			push @errors, "$path: $@";
-		} elsif (!defined $cwd) {
-			push @errors, "$path: $!";
-		} elsif (!chdir $cwd) {
-			push @errors, "$cwd: $!";
-		} else {
-			return 1;
-		}
-		0
-	};
-
-	  # If $pgid is still alive we can use its CWD
-	if (-d "/proc/$pgid" && $try->($pgid)) {
-		return;
-	}
-
-	# If $pgid is no longer with us, we need to go through all running
-	# processes and filter the ones which are in process group $pgid.
-	if (opendir(my $dir, '/proc')) {
-		while (my $pid = readdir $dir) {
-			if ($pid =~ /^[0-9]+$/ && $pid != $pgid &&
-			    open(my $fh, '<', "/proc/$pid/stat")) {
-				if ($pgid == (split ' ', scalar <$fh>)[4] &&
-				    $try->($pid)) {
-					return;
-				}
-			}
-		}
+if (@ARGV) {
+	if ($ARGV[0] ne '-e') {
+		fatal $ARGV[0], 'unexpected argument';
+	} elsif (@ARGV == 1) {
+		fatal 'command expected after -e switch';
 	} else {
-		push @errors, "/proc: $!";
+		shift @ARGV;
 	}
 
-	for (@errors) {
-		error $_;
-	}
-	error("can't find " . (@errors ? 'CWD of' : 'process in') .
-	      " group $pgid; won't change directory");
+	# If ‘-e’ was given, the first tab will use it and only second
+	# tab will use per-tab configuration.
+	--$num;
 }
 
-if (defined $p) {
-	if ($p >= 0) {
-		try_cwd_of_group $p;
-	}
-} elsif (!defined $n) {
-	error 'neither -n nor -p given, this script won’t add anything useful';
+if (0 <= $num && $num < @commands) {
+	@ARGV = @{ $commands[$n] };
 }
-
-if (defined $n && @commands) {
-	if ($command) {
-		# If ‘-e’ was given, the first tab will use it and only second
-		# tab will use per-tab configuration.
-		--$n;
-	}
-
-	if ($n >= 0) {
-		$command = $commands[$n] // $command;
-	}
-} elsif (defined $n) {
-	error 'no per-tab commands configured, ignoring -n switch';
-} elsif (@commands) {
-	error '-n switch not present, ignoring per-tab commands';
+if (!@ARGV) {
+	@ARGV = ($ENV{'SHELL'} // '/bin/sh');
 }
-
-$command = $command // [$ENV{'SHELL'} // '/bin/sh'];
-my $prog = $command->[0];
-exec $prog @{ $command } or fatal $prog, "$!";
+{ exec { $ARGV[0] } @ARGV }
+fatal $ARGV[0], "$!";
