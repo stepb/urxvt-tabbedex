@@ -10,7 +10,7 @@ L         = $(DESTDIR)/$(PREFIX)/$(LIBDIR)/urxvt
 M         = $(DESTDIR)/$(PREFIX)/$(MANDIR)/man1
 D         = $(DESTDIR)/$(PREFIX)/$(DOCDIR)
 
-DIST      = tabbedex command-runner.sample
+DIST      = tabbedex command-runner.sample pgid-cd.pl
 
 
 all: man html
