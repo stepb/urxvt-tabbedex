@@ -62,12 +62,11 @@ L<urxvt-tabbed(1)> and L<tabbedex-pgid-cd(1)>
 
 =cut
 
+trap 'echo "Press RETURN to continue." >&2 && read && exit 1' 0
 if [ $# -lt 2 ]; then
-	echo "usage: /bin/sh ${0##*/} <id> <command> [ <args> ... ]"
-	echo "Press RETURN to continue."
-	read
+	echo "usage: /bin/sh ${0##*/} <id> <command> [ <args> ... ]" >&2
 	exit 1
-fi >&2
+fi
 
 id=$1
 shift
