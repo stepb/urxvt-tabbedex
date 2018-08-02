@@ -58,6 +58,10 @@ Tabbedex will replace B<%p> sequence with an ID of a process in foreground of
 current tab such that command in the new tab will inherit current working
 directory from existing tab.
 
+=head1 SEE ALSO
+
+L<urxvt-tabbed(1)> and L<tabbedex-command-runner(1)>
+
 =cut
 
 use warnings;

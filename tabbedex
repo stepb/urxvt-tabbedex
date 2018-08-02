@@ -384,6 +384,34 @@ Sets name of the current tab to I<name>.
 
 =back
 
+=head1 SEE ALSO
+
+L<urxvt(1)>, L<urxvt-tabbed(1)>, L<tabbedex-command-runner(1)> and
+L<tabbedex-pgid-cd(1)>
+
+=head1 COPYRIGHT
+
+Copyright (c) 2006-2018 tabbed and tabbedex authors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=head1 AUTHOR
+
+tabbedex has been created (as a fork of L<urxvt-tabbed(1)>) and is maintained by
+Michal Nazarewicz.  For list of authors see B<AUTHORS> file distributed with the
+extension.  Send bug reports and comments to mina86@mina86.com or file them at
+L<https://github.com/mina86/urxvt-tabbedex>.
+
 =cut
 
 use Scalar::Util;

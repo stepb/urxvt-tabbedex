@@ -64,6 +64,10 @@ To use this script with B<pgid-cd.pl> the resource becomes:
         -e /usr/lib/urxvt/tabbadex-pgid-cd %p \
         %~/.urxvt/command-runner.pl %n %e
 
+=head1 SEE ALSO
+
+L<urxvt-tabbed(1)> and L<tabbedex-pgid-cd(1)>
+
 =cut
 
 use warnings;
