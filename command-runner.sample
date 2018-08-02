@@ -1,4 +1,5 @@
-#!/usr/bin/env perl
+#!/bin/sh
+: <<'=cut'
 
 =head1 NAME
 
@@ -6,63 +7,54 @@ command-runner.sample - example script for use with tabbedex tab-arguments
 
 =head1 SYNOPSIS
 
-command-runner.sample I<num> [ B<-e> I<command> [ I<args> ... ]]
+command-runner.sample I<id> I<command> [ I<args> ... ]
 
 =head1 DESCRIPTION
 
-Runs one of predefined commands, command given on command line or starts
-a shell.  A list of command is specified in the source code of this script (see
-B<@commands> list) and if B<-e> switch is not given the script will start
-command at index I<num> or shell.  If B<-e> switch is given, I<num> indexing is
-shifted by one as if I<command> was the first entry in predefined list.
+Runs one of predefined commands (if I<id> matches any known identifier) or one
+specified as an argument.  Predefined commands are hard-coded in the source code
+of this script.
 
 =head1 OPTIONS
 
 =over
 
-=item I<num>
+=item I<id>
 
-Non-negative index of the predefined command to execute.  If B<-e> switch is not
-given, this is zero-indexed; if B<-e> switch is given, zero means to execute
-command given by B<-e> and predefined commands become indexed starting from one.
+Identifier of a predefined command to run.  Typically a zero-indexed integer but
+it actually can be whatever.
 
-=item B<-e> I<command> [ I<args> ... ]
+=item I<command> [ I<args> ... ]
 
-If given, command to execute when I<num> is zero or goes past the list of
-predefined commands.
+Command to execute if I<id> does not match any know predefined commands.
 
 =back
 
 =head1 TABBEDEX
 
-The script was designed to work with tabbedex urxvt plugin and in particular its
-B<tab-arguments> configuration resource.  It can be used to start different
-commands in different subsequent tabs.  To make use of it copy it, make it
-executable and change the B<@commands> list near the beginning of the file.  For
-example, if urxvt-tabbedex is installed to B</usr/lib/urxvt>, the following
-steps are a good start:
+The script was designed to work with tabbedex urxvt plugin.  It can be used to
+execute different commands in subsequent tabs.  To use it, copy it and change
+list of commands at the end of the script.  For example, if urxvt-tabbedex is
+installed to B</usr/lib/urxvt>, the following steps are a good start:
 
     mkdir -p ~/.urxvt
     cp /usr/lib/urxvt/tabbedex-command-runner.sample \
-       ~/.urxvt/command-runner.pl
-    chmod 700 -- ~/.urxvt/command-runner.pl
-    ${VISUAL:-${EDITOR:-/bin/vi}} ~/.urxvt/command-runner.pl
+       ~/.urxvt/command-runner.sh
+    ${VISUAL:-${EDITOR:-/bin/vi}} ~/.urxvt/command-runner.sh
 
-Once this is done, the B<tab-arguments> resource must be configured properly,
-e.g.:
+Finally, configure B<tab-arguments> resource, for example:
 
     URxvt.tabbedex.tab-arguments: \
-        -e %~/.urxvt/command-runner.pl %n %e
+        -e /bin/sh %~/.urxvt/command-runner.sh %n %E
 
-With this done, each time new tab is started, this script will be run which will
-allow what actual command is executed be configured.  See B<@commands> list near
-the beginning for some examples.
+With this done, each time new tab is started, this script will be run so that it
+can decide what actual command is executed in the tab.
 
 To use this script with B<pgid-cd.pl> the resource becomes:
 
     URxvt.tabbedex.tab-arguments: \
         -e /usr/lib/urxvt/tabbadex-pgid-cd %p \
-        %~/.urxvt/command-runner.pl %n %e
+        /bin/sh %~/.urxvt/command-runner.pl %n %e
 
 =head1 SEE ALSO
 
@@ -70,53 +62,28 @@ L<urxvt-tabbed(1)> and L<tabbedex-pgid-cd(1)>
 
 =cut
 
-use warnings;
-use strict;
+if [ $# -lt 2 ]; then
+	echo "usage: /bin/sh ${0##*/} <id> <command> [ <args> ... ]"
+	echo "Press RETURN to continue."
+	read
+	exit 1
+fi >&2
 
-my @commands = (
-	# First tab is shell
-	[qw(bash)],
-	# Second tab is Emacs
-	[qw(emacs -nw)],
-	# In third, let’s tail /var/log/syslog
-	[qw(tail -f /var/log/syslog)],
-);
+id=$1
+shift
 
-sub error {
-	print STDERR join(': ', $0, @_), "\n";
-}
+#### Predefined commands ####
 
-sub fatal {
-	error @_;
-	error 'use Ctrl+C to terminate this script';
-	sleep;
-	exit 1;
-}
-
-my $num = shift @ARGV;
-if ($num !~ /^\d+$/) {
-	fatal 'non-negative integer expected as first argument'
-}
-
-if (@ARGV) {
-	if ($ARGV[0] ne '-e') {
-		fatal $ARGV[0], 'unexpected argument';
-	} elsif (@ARGV == 1) {
-		fatal 'command expected after -e switch';
-	} else {
-		shift @ARGV;
-	}
-
-	# If ‘-e’ was given, the first tab will use it and only second
-	# tab will use per-tab configuration.
-	--$num;
-}
-
-if (0 <= $num && $num < @commands) {
-	@ARGV = @{ $commands[$n] };
-}
-if (!@ARGV) {
-	@ARGV = ($ENV{'SHELL'} // '/bin/sh');
-}
-{ exec { $ARGV[0] } @ARGV }
-fatal $ARGV[0], "$!";
+case $id in
+0) # First tab is shell
+	exec "${SHELL:-bash}"
+	;;
+1) # Second tab is Emacs
+	exec emacs -nw
+	;;
+2) # In third, let’s tail /var/log/syslog
+	exec tail -f /var/log/syslog
+	;;
+*) # If nothing matches, run whatever was given as an argument
+	exec "$@"
+esac
