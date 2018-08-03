@@ -45,8 +45,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-version=$(git log -1 --format=%cd --date=format:%g.%-V%u)
-version=$version${patchlevel:+.$patchlevel}
+version=$(date +%g.%-V%u)${patchlevel:+.$patchlevel}
 pkg=urxvt-tabbedex-$version
 
 out=${TMPDIR:-/tmp}/$pkg.tar.bz2
