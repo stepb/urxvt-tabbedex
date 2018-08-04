@@ -45,7 +45,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-version=$(date +%g.%-V%u)${patchlevel:+.$patchlevel}
+version=$(date +%g.%V%u)${patchlevel:+.$patchlevel}
 pkg=urxvt-tabbedex-$version
 
 out=${TMPDIR:-/tmp}/$pkg.tar.bz2
@@ -75,6 +75,11 @@ mkdir -- "$tmp/$pkg/experimental"
 git format-patch -o "$tmp/$pkg/experimental" "$master".."$experimental" >/dev/null
 
 echo "$version" >$tmp/$pkg/.version
+
+mkdir -- "$tmp/$pkg/release-notes"
+for tag in $(g tag | grep -o '^v[1-9][0-9]\.[0-9][0-9][0-9]$'); do
+	git cat-file tag $tag | sed '1,/^$/d' >$tmp/$pkg/release-notes/$tag.txt
+done
 
 cd -- "$tmp"
 echo
