@@ -779,8 +779,8 @@ sub args_percent_substitution {
 	} elsif ($ch eq '~') {
 		exists $ENV{'HOME'} ? quote_words $ENV{'HOME'} : '/'
 	} else {
-		urxvt::warn('tabbedex: unrecognised substitution in value of ' .
-		            '‘tab-arguments’ resource: ‘%' . $ch .
+		urxvt::warn('tabbedex: unrecognised substitution in ' .
+		            '‘tab-arguments’: ‘%' . $ch .
 		            "’; will substitute with empty string\n");
 		''
 	}
@@ -1012,7 +1012,10 @@ sub init {
    $root->{reopen_on_close}  = $rs->bool('reopen-on-close', 0);
    $root->{tab_arguments}    = $rs->text('tab-arguments', '');
 
-   if ($rs->text('new-tab-command')) {
+   # TODO: Warning added on 2018/08/04.  Eventually remove ‘!defined
+   # tab-arguments’ condition and then the whole warning.
+   if (defined $rs->text('new-tab-command') &&
+       !defined $rs->text('tab-arguments')) {
       urxvt::warn('tabbedex: ‘new-tab-command’ resource is no longer ' .
                   "recognised; use ‘tab-arguments’ instead\n");
    }
