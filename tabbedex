@@ -491,7 +491,6 @@ sub enable_action_hooks {
 			goto \&urxvt::ext::tabbedex::root::tab_action;
 		}
 	} : sub {
-		my ($tab, $cmd) = shift;
 		if ($_[1] =~ s/^tabbedex://) {
 			unshift @_, $_[0]{root};
 			goto \&urxvt::ext::tabbedex::root::tab_action;
