@@ -7,13 +7,13 @@ command-runner.sample - example script for use with tabbedex tab-arguments
 
 =head1 SYNOPSIS
 
-command-runner.sample I<id> I<command> [ I<args> ... ]
+command-runner.sample I<id> I<command> [ I<arguments> ... ]
 
 =head1 DESCRIPTION
 
-Runs one of predefined commands (if I<id> matches any known identifier) or one
-specified as an argument.  Predefined commands are hard-coded in the source code
-of this script.
+Runs a predefined commands identified by I<id> or I<command> if I<id> doesn't
+match any.  Predefined commands are hard-coded in the source code of this
+script.
 
 =head1 OPTIONS
 
@@ -21,21 +21,21 @@ of this script.
 
 =item I<id>
 
-Identifier of a predefined command to run.  Typically a zero-indexed integer but
-it actually can be whatever.
+Identifier of a predefined command to run.  Typically a zero-indexed integer.
 
-=item I<command> [ I<args> ... ]
+=item I<command> [ I<arguments> ... ]
 
-Command to execute if I<id> does not match any know predefined commands.
+Command to execute if I<id> does not match any know predefined command.
 
 =back
 
 =head1 TABBEDEX
 
-The script was designed to work with tabbedex urxvt plugin.  It can be used to
-execute different commands in subsequent tabs.  To use it, copy it and change
-list of commands at the end of the script.  For example, if urxvt-tabbedex is
-installed to B</usr/lib/urxvt>, the following steps are a good start:
+The script is designed to work with tabbedex urxvt plugin (and showcase its
+I<tab-arguments> configuration resource).  It can be used to execute different
+commands in different tabs.  To use it, copy it and edit list of commands at the
+end of the file.  Provided urxvt-tabbedex is installed in B</usr/lib/urxvt>, the
+following steps are a good start:
 
     mkdir -p ~/.urxvt
     cp /usr/lib/urxvt/tabbedex-command-runner.sample \
@@ -50,13 +50,14 @@ Finally, configure B<tab-arguments> resource, for example:
 With this done, each time new tab is started, this script will be run so that it
 can decide what actual command is executed in the tab.
 
-To use this script with B<pgid-cd.pl> the resource becomes:
+To use this script in conjunction with B<pgid-cd.pl> tool also packaged with
+urxvt-tabbedex, the resource should be:
 
     URxvt.tabbedex.tab-arguments: \
         -e /usr/lib/urxvt/tabbadex-pgid-cd %p \
         /bin/sh %~/.urxvt/command-runner.sh %n %e
 
-(subject to where the files are actually located).
+(modulo the actual location of the files).
 
 =head1 SEE ALSO
 

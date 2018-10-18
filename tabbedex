@@ -208,8 +208,8 @@ passed when running urxvt will be completely ignored.
 =item I<%E>
 
 Similar to I<%e> but I<-e> is not included in the expansion and if I<%e> would
-expand to an empty string <%E> expands to value of SHELL environment variable or
-I</bin/sh> if that's empty.  This means that <%E> is always a valid command.
+expand to an empty string I<%E> expands to value of SHELL environment variable
+or I</bin/sh> if that's empty.  This means that I<%E> is always a valid command.
 
 For example, here's how the sequence can be used to set TABBEDEX_NUM environment
 variables when running a command:
@@ -249,8 +249,7 @@ has.
 
 If set, the default key bindings (described at the beginning of this document)
 are not set up.  The mappings can be recreated using urxvt's B<keysym.*>
-resources.  For example, the following will recreate all the default key
-bindings:
+resources:
 
     URxvt.tabbedex.no-tabbedex-keys: yes
     URxvt.keysym.Shift-Left:    tabbedex:prev_tab
