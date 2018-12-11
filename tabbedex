@@ -318,15 +318,21 @@ is set.
 
 =head1 ACTIONS AND USER COMMANDS
 
-tabbedex supports several actions which can be bound to keys with
-B<URxvt.keysym>.I<keysym> resource, for example:
+tabbedex supports actions which can be bound to keystrokes using
+B<URxvt.keysym>.I<keysym> resource.  For example:
 
-    URxvt.keysym.Control-t: tabbedex:new_tab
+    URxvt.keysym.Control-t:            tabbedex:new_tab
+    URxvt.keysym.Control-Tab:          tabbedex:next_tab
+    URxvt.keysym.Control-Shift-Tab:    tabbedex:prev_tab
+    ! Shift-Tab is often bound to ISO_Left_Tab in X keyboard
+    ! layouts.  In those layouts Control-Shift-Tab won't
+    ! work and Control-ISO_Left_Tab is needed instead:
+    URxvt.keysym.Control-ISO_Left_Tab: tabbedex:prev_tab
 
-which creates a key binding for I<Ctrl+T> to create a new tab.  Using the name
-of the extension as the prefix of the keysym binding is preferred but when
-running an ancient urxvt (as in anything prior to 9.21) an alternative
-B<perl:tabbedex> must be used instead.
+makes I<Ctrl+T> create a new tab and I<Ctrl+Tab> and I<Ctrl+Shift+Tab> switch
+between existing tabs.  Using the name of the extension as the prefix of the
+keysym binding is preferred but when running an ancient urxvt (i.e. anything
+prior to 9.21) an alternative B<perl:tabbedex> must be used instead.
 
 Supported actions are:
 
