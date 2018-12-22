@@ -535,6 +535,15 @@ use Encode qw(decode);
 	}
 }
 
+
+sub warn {
+	my ($root, $msg) = @_;
+	$root = shift;
+	my $extname = $root->{_name} // 'tabbedex';
+	urxvt::warn($extname . ': ' . join('', @_) . "\n");
+}
+
+
 {
 
 my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
@@ -783,9 +792,8 @@ sub args_percent_substitution {
 	} elsif ($ch eq '~') {
 		exists $ENV{'HOME'} ? quote_words $ENV{'HOME'} : '/'
 	} else {
-		urxvt::warn('tabbedex: unrecognised substitution in ' .
-		            '‘tab-arguments’: ‘%' . $ch .
-		            "’; will substitute with empty string\n");
+		$root->warn('unrecognised substitution in ‘tab-arguments’: ',
+			    '‘%', $ch, '’; will substitute with empty string');
 		''
 	}
 }
@@ -806,8 +814,8 @@ sub new_tab {
 		if (defined Text::ParseWords::shellwords($args)) {
 			$args = [Text::ParseWords::shellwords($args)];
 		} else {
-			urxvt::warn('tabbedex: error parsing ‘tab-arguments’ ' .
-		            'value: ‘' . $args . "’; ignoring\n");
+			$root->warn('error parsing ‘tab-arguments’ value: ‘',
+				    $args, '’; ignoring');
 			$args = $root->{argv};
 		}
 	}
@@ -1020,8 +1028,8 @@ sub init {
    # tab-arguments’ condition and then the whole warning.
    if (defined $rs->text('new-tab-command') &&
        !defined $rs->text('tab-arguments')) {
-      urxvt::warn('tabbedex: ‘new-tab-command’ resource is no longer ' .
-                  "recognised; use ‘tab-arguments’ instead\n");
+      $root->warn('‘new-tab-command’ resource is no longer recognised; ',
+                  'use ‘tab-arguments’ instead');
    }
 
    if (my $blacklist = $rs->text('perl-ext-blacklist')) {
@@ -1212,6 +1220,8 @@ sub tab_action {
 		}
 	} elsif ($cmd eq 'kill_tab') {
 		$tab->destroy;
+	} else {
+		$root->warn('unrecognised action: ‘', $cmd, '’; ignoring');
 	}
 	()
 }
@@ -1317,8 +1327,9 @@ sub start_rename_tab {
 sub finish_rename_tab {
 	my ($tab, $accept) = @_;
 	if (!$tab->is_being_renamed) {
-		urxvt::warn('finish_rename_tab called on tab which is not ' .
-			    "being renamed\n");
+		$tab->{root}->warn('finish_rename_tab called on tab which is ',
+				   'not being renamed; this is an internal ',
+				   'error, please report it');
 		return;
 	}
 	if ($accept) {
@@ -1403,9 +1414,9 @@ sub text {
 	my $value = $root->x_resource("$prefix.$name");
 	if (defined $value && defined $extname &&
 	    $prefix ne $extname && $prefix ne '%') {
-		urxvt::warn("$extname: ‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.\n");
-		urxvt::warn("$extname: With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘$extname’), for example:\n");
-		urxvt::warn("$extname:     URxvt.$extname.$name: $value\n");
+		$root->warn('‘tabbed.tabbedex-rs-prefix’ resource is deprecated and should be set to ‘%’ or tabbedex configuration will stop working.');
+		$root->warn('With that changed, all tabbedex resources must use extension’s name as prefix (i.e. ‘', $extname, '’), for example:');
+		$root->warn("    URxvt.$extname.$name: $value");
 		pop @$rs;
 	}
 	defined $value ? $root->locale_decode($value) : $default
