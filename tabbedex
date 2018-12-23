@@ -338,7 +338,7 @@ Supported actions are:
 
 =over
 
-=item B<tabbedex:new_tab> and B<tabbedex:new_tab:>I<arguments>,
+=item B<tabbedex:new_tab> and B<tabbedex:new_tab:>I<arguments>
 
 Creates a new tab, puts it at the end of the tab list and switches to it.  In
 the second form, I<arguments> temporarily override value of the B<tab-arguments>
@@ -358,7 +358,7 @@ or after (if I<side> is B<after>) the current tab on the tab list.  For example,
 
     URxvt.keysym.C-t:   tabbedex:new_tab_after_this
 
-makes ICtrl+T> start a new tab next to the current one.
+makes I<Ctrl+T> start a new tab next to the current one.
 
 =item B<tabbedex:next_tab> and B<tabbedex:prev_tab>
 
