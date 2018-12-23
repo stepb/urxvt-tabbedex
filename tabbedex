@@ -338,17 +338,27 @@ Supported actions are:
 
 =over
 
-=item B<tabbedex:new_tab> or B<tabbedex:new_tab:I<arguments>>
+=item B<tabbedex:new_tab> and B<tabbedex:new_tab:>I<arguments>,
 
-Creates a new tab.  In the second form, I<arguments> temporarily override value
-of the B<tab-arguments> resource.  This makes it possible to create bindings
-which start particular commands, for example:
+Creates a new tab, puts it at the end of the tab list and switches to it.  In
+the second form, I<arguments> temporarily override value of the B<tab-arguments>
+resource.  This makes it possible to create bindings which start particular
+commands, for example:
 
     URxvt.keysym.F1:    tabbedex:new_tab:-e info
 
 makes it such that pressing F1 will open a new tab running B<info> command.
 (Remember that I<arguments> are passed as arguments to urxvt so to run a command
 B<-e> is required as in example above).
+
+=item B<tabbedex:new_tab_>I<side>B<_this> and B<tabbedex:new_tab_>I<side>B<_this:>I<arguments>
+
+Like B<tabbedex:new_tab> but puts the new tab before (if I<side> is B<before>)
+or after (if I<side> is B<after>) the current tab on the tab list.  For example,
+
+    URxvt.keysym.C-t:   tabbedex:new_tab_after_this
+
+makes ICtrl+T> start a new tab next to the current one.
 
 =item B<tabbedex:next_tab> and B<tabbedex:prev_tab>
 
@@ -746,8 +756,9 @@ sub refresh {
 }
 
 sub tab_term_init {
-	my ($root, $term) = @_;
+	my ($root, $term, $index) = @_;
 	$term->{'tabbedex-root-tab'} = $root;
+	$term->{'tabbedex-tab-index'} = $index;
 
 	for (0 .. urxvt::NUM_RESOURCES - 1) {
 		if (defined(my $value = $root->{resource}[$_])) {
@@ -799,7 +810,7 @@ sub args_percent_substitution {
 }
 
 sub new_tab {
-	my ($root, $tab, $args) = @_;
+	my ($root, $tab, $args, $index) = @_;
 
 	if (!defined $args) {
 		$args = $root->{tab_arguments};
@@ -820,7 +831,7 @@ sub new_tab {
 		}
 	}
 
-	push @urxvt::TERM_INIT, sub { $root->tab_term_init($_[0]) };
+	push @urxvt::TERM_INIT, sub { $root->tab_term_init($_[0], $index) };
 	push @urxvt::TERM_EXT, urxvt::ext::tabbedex::;
 	new urxvt::term
 		$root->env, $urxvt::RXVTNAME,
@@ -1100,8 +1111,13 @@ _on wm_delete_window => sub {
 
 sub tab_start {
 	my ($root, $tab) = @_;
+	my $index = delete $tab->{term}{'tabbedex-tab-index'};
 	$tab->XChangeInput ($tab->parent, urxvt::PropertyChangeMask);
-	push @{ $root->{tabs} }, $tab;
+	if (defined $index && $index < @{ $root->{tabs} }) {
+		splice @{ $root->{tabs} }, $index, 0, $tab;
+	} else {
+		push @{ $root->{tabs} }, $tab;
+	}
 	++$root->{total_tabs_open};
 	$root->make_current($tab);
 	();
@@ -1195,9 +1211,13 @@ sub tab_add_lines {
 
 sub tab_action {
 	my ($root, $tab, $cmd) = @_;
-	if ($cmd =~ /^new_tab(?::(.*))?$/) {
+	if ($cmd =~ /^new_tab(?:_(before|after)_this)?(?::(.*))?$/) {
 		if (!$root->{cur}->is_being_renamed) {
-			$root->new_tab($tab, $1);
+			my $index;
+			if (defined $1) {
+				$index = $tab->index + ($1 eq 'after');
+			}
+			$root->new_tab($tab, $2, $index);
 		}
 	} elsif ($cmd eq 'next_tab') {
 		$root->change_tab($tab, 1);
