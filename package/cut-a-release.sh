@@ -45,7 +45,7 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-version=$(date +%g.%V%u)${patchlevel:+.$patchlevel}
+version=$(date +%g.%V)${patchlevel:+.$patchlevel}
 pkg=urxvt-tabbedex-$version
 
 out=${TMPDIR:-/tmp}/$pkg.tar.bz2
