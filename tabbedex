@@ -88,7 +88,7 @@ This can be configured using a C<tabbedex-rs-prefix> resource, for example:
     URxvt.tabbed.tabbedex-rs-prefix: %
 
     ! Affects tabbed plugin only:
-    URxvt.tabbed.tabbar-fg: 4
+    URxvt.tabbed.tabbar-fg:
     URxvt.tabbed.tabbar-bg: 0
 
     ! Affects tabbedex plugin only:
@@ -118,61 +118,50 @@ displayed.
 If set, a C<NEW> button will be displayed on the left of the tab bar.  Clicking
 the button creates a new tab.  It is not displayed by default.
 
-=item B<tabbar-fg>: I<colour>
+=item B<title>: I<boolean>
 
-=item B<tabbar-bg>: I<colour>
+If set (the default), when tab bar is visible and there is enough space left,
+current tab's title will be displayed after the last tab.
 
-Foreground and background colours of the tab bar.  (3, 0) by default which
-translates to brown/dark yellow on black background.
+=item B<tabbar-fg>:   [I<style>] I<colour>  and  B<tabbar-bg>:   I<colour>
+
+=item B<tab-fg>:      [I<style>] I<colour>  and  B<tab-bg>:      I<colour>
+
+=item B<bell-fg>:     [I<style>] I<colour>  and  B<bell-bg>:     I<colour>
+
+=item B<bell-tab-fg>: [I<style>] I<colour>  and  B<bell-tab-bg>: I<colour>
+
+=item B<title-fg>:    [I<style>] I<colour>  and  B<title-bg>:    I<colour>
+
+Foreground and background styles of respectively: the tab bar (including
+inactive tabs), the current/active tab on the tab bar and new button, an
+inactive tab on which bell has rung, an active tab on which bell has rung and
+finally the tab title.
 
 Colours can be specified as: I<-2> meaning default foreground, I<-1> meaning
 default background, an integer between B<0> and B<255> specifying index in
-terminal' colour palette or any other string which X11 recognises as a colour.
+terminal' colour palette or any other string which X11 recognises as a colour
+(e.g. B<#1155CC>).
 
-=item B<tab-fg>: I<colour>
+Furthermore, the B<-fg> resource can be prefixed by combination of B<bold>,
+B<italic>, B<blink>, B<reverse-video> and B<underline> which specify the
+font-style of the text.
 
-=item B<tab-bg>: I<colour>
+The default values for the settings are as follows:
 
-Foreground and background colours of the current tab on the tab bar.  (0, 1) by
-default which translates to black on red.  See B<tabbar-fg> for more
-documentation on how colours can be specified.
-
-=item B<bell-fg>: I<colour>
-
-=item B<bell-bg>: I<colour>
-
-Foreground and background colours of an inactive tab on which bell has rung.
-(0, 3) by default which translates to black on brown/dark yellow (i.e. inverse
-of the default tab bar colours).  See B<tabbar-fg> for more documentation on how
-colours can be specified.
-
-=item B<bell-tab-fg>: I<colour>
-
-=item B<bell-tab-bg>: I<colour>
-
-Foreground and background colours of a active tab in which bell is ringing.  (5,
-4) by default which translates to magenta an blue.  See B<tabbar-fg> for more
-documentation on how colours can be specified.  The bell is said to be ringing
-on an active tab for B<bell-timeout> seconds after it started.
+    Component | *-fg          | *-bg | Description
+    ----------+---------------+------+----------------------
+    tabbar    |             3 |    0 | brown text on black
+    tab       | bold        0 |    1 | black text on red
+    bell      |      italic 0 |    3 | black text on brown
+    bell-tab  | bold italic 5 |    4 | magenta text on blue
+    title     |      italic 2 |    0 | green text on black
 
 =item B<bell-timeout>: I<integer>
 
 Time in seconds, one second by default, a bell is said to be ringing on current
 tab for after it was rung.  Setting this to zero essentially disables the
 B<bell-tab-(fg|bg)> styling of tabs.
-
-=item B<title>: I<boolean>
-
-If set (the default), when tab bar is visible and there is enough space left,
-current tab's title will be displayed after the last tab.
-
-=item B<title-fg>: I<colour>
-
-=item B<title-bg>: I<colour>
-
-Foreground and background colours of the tab title.  (2, 0) by default which
-translates to green on black.  See B<tabbar-fg> for more documentation on how
-colours can be specified.
 
 =item B<tab-arguments>: I<string>
 
@@ -1010,6 +999,11 @@ sub init {
    if (defined(my $key = $urxvt::OPTION{scrollBar})) {
       $root->{option}{$key} = $root->option($key, 0);
    }
+   # Disable ‘intensityStyles’ so that bold, blink etc. specified in tabbar
+   # styles don’t affect the colours.
+   if (defined(my $key = $urxvt::OPTION{intensityStyles})) {
+      $root->{option}{$key} = $root->option($key, 0);
+   }
 
    my $rs = new urxvt::ext::tabbedex::rs_reader($root);
 
@@ -1048,12 +1042,12 @@ sub init {
        $root->{perl_ext_blacklist} = ',-' . $blacklist;
    }
 
-   my ($colours, $colours_cmd) = $rs->colours([3, 0, 'tabbar'],
-                                              [0, 1, 'tab'],
-                                              [0, 3, 'bell'],
-                                              [5, 4, 'bell-tab'],
-                                              [2, 0, 'title']);
-   $root->{init_cmd} = "$colours_cmd\033[?25l";
+   my ($colours, $cmd) = $rs->colours(['            3', '0', 'tabbar'],
+                                      ['bold        0', '1', 'tab'],
+                                      ['     italic 0', '3', 'bell'],
+                                      ['bold italic 5', '4', 'bell-tab'],
+                                      ['     italic 2', '0', 'title']);
+   $root->{init_cmd} = $cmd . "\033[?25l";
    $root->{rs_colours} = $colours;
 }
 
@@ -1450,19 +1444,31 @@ sub bool {
 sub colours {
 	my $rs = shift;
 
-	my (@suffix, %used) = ('-fg', '-bg');
+	my %styles = (
+		bold            => urxvt::RS_Bold,
+		italic          => urxvt::RS_Italic,
+		blink           => urxvt::RS_Blink,
+		'reverse-video' => urxvt::RS_RVid,
+		underline       => urxvt::RS_Uline
+	);
+	my $styles = join '|', keys %styles;
+
+	my (@suffix, @styles, %used) = ('-fg', '-bg');
 	for my $c (@_) {
+		my $style = urxvt::DEFAULT_RSTYLE;
 		for my $i (0, 1) {
-			my $value = $rs->text($c->[2] . $suffix[$i]);
-			if (defined $value) {
-				$value =~ s/\s+/ /g;
-				$value =~ s/^ | $//g;
-				if ($value =~ /^[-#a-zA-Z0-9 ]/) {
-					$c->[$i] = $value;
-				}
+			my $value = $rs->text($c->[2] . $suffix[$i], $c->[$i]);
+			$value =~ s/\s+/ /g;
+			$value =~ s/^ | $//g;
+			while ($i == 0 && $value =~ s/^($styles) //) {
+				$style |= $styles{$1};
+			}
+			if ($value =~ /^[-#a-zA-Z0-9 ]/) {
+				$c->[$i] = $value;
 			}
 			$used{$c->[$i]} = undef;
 		}
+		push @styles, $style;
 	}
 
 	my ($i, $cmd) = (0, '');
@@ -1476,13 +1482,12 @@ sub colours {
 		}
 	}
 
-	my $default = urxvt::DEFAULT_RSTYLE;
 	for $i (0..$#_) {
 		my ($fg, $bg) = @{ $_[$i] };
-		$_[$i] = urxvt::SET_COLOR $default, $used{$fg}, $used{$bg};
+		$styles[$i] = urxvt::SET_COLOR $styles[$i], $used{$fg}, $used{$bg};
 	}
 
-	(\@_, $cmd ? "\e]4$cmd\a" : '')
+	(\@styles, $cmd ? "\e]4$cmd\a" : '')
 }
 
 
@@ -1567,8 +1572,8 @@ sub apply {
 	$bar->{pipe_pending} = 0;
 	$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}),
 	              $bar->{pad_colour});
-	my ($root, $cur) = ($bar->{root}, $bar->{cursor});
-	$root->cmd_parse(defined($cur) ? "\e[1;${cur}f\e[?25h" : "\e[?25l");
-	$root->ROW_t(0, $bar->{text}, 0, 0, $bar->{ncol});
-	$root->ROW_r(0, $bar->{rend}, 0, 0, $bar->{ncol});
+	my ($term, $cur) = ($bar->{root}{term}, $bar->{cursor});
+	$term->cmd_parse(defined($cur) ? "\e[1;${cur}f\e[?25h" : "\e[?25l");
+	$term->ROW_t(0, $bar->{text});
+	$term->ROW_r(0, $bar->{rend});
 }
