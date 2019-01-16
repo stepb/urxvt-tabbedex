@@ -157,7 +157,7 @@ The default values for the settings are as follows:
     bell-tab  | bold italic 5 |    4 | magenta text on blue
     title     |      italic 2 |    0 | green text on black
 
-=item B<bell-timeout>: I<integer>
+=item B<bell-timeout>: I<number>
 
 Time in seconds, one second by default, a bell is said to be ringing on current
 tab for after it was rung.  Setting this to zero essentially disables the
@@ -543,26 +543,25 @@ sub warn {
 }
 
 
-{
-
-my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
-
 sub tab_activity_marks {
 	my ($root, $tab, $now) = @_;
 	if (!defined($tab->{last_activity})) {
 		return (' ', ' ');
-	} elsif (defined $root->{timeouts}) {
-		my $diff = $now - $tab->{last_activity};
-		for my $spec (@{ $root->{timeouts} }) {
-			my ($time, $left) = @$spec;
-			if ($diff >= $time) {
-				return ($left, $matching_marks{$left} // $left);
-			}
+	}
+	my $diff = $now - $tab->{last_activity};
+	my $prev;
+	for my $spec (@{ $root->{timeouts} }) {
+		my ($time, $left, $right) = @$spec;
+		if ($diff < $time) {
+			$prev = $time;
+		} elsif (wantarray) {
+			my $next = defined $prev ? $prev - $diff : undef;
+			return ($left, $right, $next);
+		} else {
+			return $left . $right;
 		}
 	}
-	('*', '*')
-}
-
+	('!', '!')  # we should never be here
 }
 
 
@@ -683,8 +682,19 @@ sub _size_tabs_for_refresh {
 	($first, $last, _tab_name_getter $max, \@names);
 }
 
+sub min {
+	@_ = grep { defined && $_ > 0 } @_;
+	my $best = shift;
+	for my $n (@_) {
+		if ($n < $best) {
+			$best = $n;
+		}
+	}
+	$best;
+}
+
 sub refresh {
-	my ($root) = @_;
+	my ($root, $now) = @_;
 
 	my $visible = (!$root->{autohide} ||
 	               @{ $root->{tabs} } > 1 ||
@@ -695,6 +705,7 @@ sub refresh {
 		$root->copy_properties;
 	}
 	if (!$visible) {
+		$root->{timer}->stop;
 		return;
 	}
 
@@ -715,16 +726,22 @@ sub refresh {
 		$bar->add_arrow(-1);
 	}
 
-	for (my $now = int urxvt::NOW; $idx <= $last; ++$idx) {
+	if (!defined $now) {
+		$now = urxvt::NOW;
+	}
+	my $min_delay;
+	for (; $idx <= $last; ++$idx) {
 		my $name = $get_name->($idx);
 		my $tab = $root->{tabs}[$idx];
 		my $color_idx = ($tab == $root->{cur}) +
 			2 * ($now < $tab->{bell_ends});
-		my ($left, $right) = $root->tab_activity_marks($tab, $now);
+		my ($left, $right, $delay) = $root->tab_activity_marks(
+			$tab, $now);
 		$bar->add_button($left . $name . $right, $color_idx, $idx);
 		if ($tab->is_being_renamed) {
 			$bar->put_cursor(-2);
 		}
+		$min_delay = min $min_delay, $delay, $tab->{bell_ends} - $now;
 	}
 
 	if ($idx < @{ $root->{tabs} }) {
@@ -742,6 +759,9 @@ sub refresh {
 
 	$bar->apply;
 	$root->want_refresh;
+	if (defined $min_delay) {
+		$root->{timer}->start($now + $min_delay);
+	}
 }
 
 sub tab_term_init {
@@ -987,6 +1007,29 @@ _on button_release => sub {
 };
 
 
+{
+
+my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
+
+sub parse_timeouts {
+	my $root = shift;
+	my $timeouts = shift // '';
+	my $re = qr/(?:\d+)?\.\d+|\d+/;
+	$re = eval { qr/\G($re):(\X)(?::|$)/ } // qr/\G($re):(.)(?::|$)/;
+	my @timeouts;
+	while ($timeouts =~ /$re/g) {
+		my $left = $root->special_encode($2);
+		push @timeouts, [$1 + 0, $left, $matching_marks{$2} // $left];
+	}
+	@timeouts = sort { $b->[0] <=> $a->[0] } @timeouts;
+	if (!@timeouts || $timeouts[$#timeouts][0] > 0) {
+		push @timeouts, [0, '*', '*'];
+	}
+	\@timeouts
+}
+
+}
+
 sub init {
    my ($root) = @_;
 
@@ -1007,21 +1050,9 @@ sub init {
 
    my $rs = new urxvt::ext::tabbedex::rs_reader($root);
 
-   my $timeouts = $rs->text('tabbar-timeouts',
-                            '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█');
-   if ($timeouts) {
-      my @timeouts;
-      my $re = eval { qr/\G(\d+):(\X)(?::|$)/ } // qr/\G(\d+):(.)(?::|$)/;
-      while ($timeouts =~ /$re/g) {
-         push @timeouts, [ $1, $root->special_encode($2) ];
-      }
-      if (@timeouts) {
-         @timeouts = sort { $b->[0] <=> $a->[0] } @timeouts;
-         $root->{timeouts} = \@timeouts;
-      }
-   }
-
-   $root->{bell_timeout}     = int($rs->text('bell-timeout') // 1);
+   $root->{timeouts} = $root->parse_timeouts($rs->text(
+      'tabbar-timeouts', '0:▁:3:▂:6:▃:9:▄:12:▅:15:▆:18:▇:21:█'));
+   $root->{bell_timeout}     = $rs->text('bell-timeout', 1) + 0;
    $root->{new_button}       = $rs->bool('new-button', 0);
    $root->{tab_title}        = $rs->bool('title', 1);
    $root->{autohide}         = $rs->bool('autohide', 1);
@@ -1049,6 +1080,8 @@ sub init {
                                       ['     italic 2', '0', 'title']);
    $root->{init_cmd} = $cmd . "\033[?25l";
    $root->{rs_colours} = $colours;
+
+   $root->{timer} = urxvt::timer->new->cb ( sub { $root->refresh; } );
 }
 
 _on start => sub {
@@ -1071,14 +1104,6 @@ _on start => sub {
    }
 
    $root->new_tab;
-
-   if (defined $root->{timeouts}) {
-      my $interval = ($root->{timeouts}[@{ $root->{timeouts} } - 1]->[0]);
-      $interval = int($interval / 4);
-      $root->{timer} = urxvt::timer->new
-                                   ->interval($interval < 1 ? 1 : $interval)
-                                   ->cb ( sub { $root->refresh; } );
-   }
 
    ();
 };
@@ -1164,14 +1189,13 @@ sub tab_property_notify {
 
 sub tab_bell {
 	my ($root, $tab, $event) = @_;
-	my $now = int urxvt::NOW;
+	my $now = urxvt::NOW;
 
 	my $key = $urxvt::OPTION{urgentOnBell};
 	if (defined($key) && $tab->option($key) && !$root->focus) {
 		$root->set_urgency(1);
 	}
 
-	my $bell = $now < $tab->{bell_ends};
 	if ($tab == $root->{cur}) {
 		$tab->{bell_ends} = $now + $root->{bell_timeout};
 	} elsif (defined($key = $urxvt::OPTION{mapAlert}) &&
@@ -1182,9 +1206,10 @@ sub tab_bell {
 		$tab->{bell_ends} = ~0;
 	}
 
-	if ($bell != ($now < $tab->{bell_ends})) {
-		$root->refresh;
-	}
+	# refresh called to update rendering (if bell wasn’t active in the tab)
+	# and update timer’s timeout.
+	$root->refresh($now);
+
 	();
 }
 
@@ -1192,11 +1217,11 @@ sub tab_bell {
 sub tab_add_lines {
 	my ($root, $tab) = @_;
 	if ($tab != $root->{cur}) {
-		my $now = int urxvt::NOW;
+		my $now = urxvt::NOW;
 		my $mark = $root->tab_activity_marks($tab, $now);
 		$tab->{last_activity} = $now;
 		if ($mark ne $root->tab_activity_marks($tab, $now)) {
-			$root->refresh;
+			$root->refresh($now);
 		}
 	}
 	();
