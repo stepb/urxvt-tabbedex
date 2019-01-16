@@ -634,32 +634,12 @@ sub _best_max_width($$$$) {
 	$max;
 }
 
-# Returns a function which yields $name for tab with given index.  Takes
-# ($max_length, \@names) as arguments.
-sub _tab_name_getter($$) {
-	my ($max_len, $names) = @_;
-	if (!defined $max_len) {
-		return sub { $names->[$_[0]] };
-	} elsif ($max_len < 2) {
-		return sub { substr $names->[$_[0]], -1 };
-	} else {
-		return sub {
-			my $n = $names->[$_[0]];
-			if ($max_len < length $n) {
-				'…' . substr $n, -($max_len - 1);
-			} else {
-				$n;
-			}
-		};
-	}
-}
-
 # Collects names of all the tabs and figures out how much of a tab name can be
 # shown and how many tabs must be omitted.  Returns three values, ($first,
-# $last, \&get_name), where:
+# $last, \@names), where:
 # - $first is index of the first tab which should be displayed,
 # - $last is index of the last tab which should be displayed and
-# - \&get_name is a subroutine which returns $name of tab with given index.
+# - \@names is an array of (possibly truncated) names of visible tabs.
 # The method takes one argument $ncol which is space available to display tabs.
 sub _size_tabs_for_refresh {
 	my ($root, $ncol) = @_;
@@ -672,14 +652,25 @@ sub _size_tabs_for_refresh {
 		$name
 	} 0..$#{ $root->{tabs} };
 
-	my ($first, $last, $max) = (0, $#names);
+	my ($first, $last) = (0, $#names);
 	if ($total > $ncol) {
 		if (@names > 3) {
 			($first, $last) = $root->_tabbar_span($ncol, \@names);
 		}
-		$max = _best_max_width $ncol, \@names, $first, $last;
+		my $max = _best_max_width $ncol, \@names, $first, $last;
+		if ($max < 2) {
+			for my $n (@names[$first..$last]) {
+				$n = substr $n, -1;
+			}
+		} else {
+			for my $n (@names[$first..$last]) {
+				if ($max < length($n)) {
+					$n = '…' . substr $n, -($max - 1);
+				}
+			}
+		}
 	}
-	($first, $last, _tab_name_getter $max, \@names);
+	($first, $last, \@names)
 }
 
 sub min {
@@ -719,7 +710,7 @@ sub refresh {
 		$bar->add_button($str, 1, -1);
 	}
 
-	my ($idx, $last, $get_name) = $root->_size_tabs_for_refresh(
+	my ($idx, $last, $names) = $root->_size_tabs_for_refresh(
 		$bar->space_left);
 
 	if ($idx) {
@@ -731,7 +722,7 @@ sub refresh {
 	}
 	my $min_delay;
 	for (; $idx <= $last; ++$idx) {
-		my $name = $get_name->($idx);
+		my $name = $names->[$idx];
 		my $tab = $root->{tabs}[$idx];
 		my $color_idx = ($tab == $root->{cur}) +
 			2 * ($now < $tab->{bell_ends});
