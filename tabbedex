@@ -565,112 +565,134 @@ sub tab_activity_marks {
 }
 
 
-# Determines which tabs are to be displayed in tabbar.  The one requirement is
-# that current tab and tabs on both sides of it must be visible.  Apart from
-# that, the method tries to cram as many tabs as possible.
-#
-# Returns a ($first, $last) pair indicating index of first and last (inclusive)
-# tab to be shown in the tabbar.
-sub _tabbar_span {
-	my ($root, $ncol, $names) = @_;
+# Returns a ($first_idx, $last_idx) list indicating index of first and last
+# (inclusive) tab to be shown in the tabbar.
+sub _tabbar_range {
+	my ($root, $ncol, $new_button, $names, $first_idx) = @_;
+	my $last_idx = $first_idx;
 
-	++$ncol;
-	my $max = int(($ncol - 9) / 3);
-	my $len = sub {
-		my $l = length $names->[$_[0]];
-		($l > $max ? $max : $l) + 3
+	my $max = int(($ncol - 1) / 3) - 3;
+	$max = $max < 2 ? 1 : $max;
+	my $width = length $names->[$first_idx];
+	$ncol -= (($width < $max ? $width : $max) + 2 +  # name and marks
+	          ($first_idx > 0 && !$new_button) +  # left arrow
+	          ($last_idx < $#$names));  # right arrow
+
+	my $try_add = sub {
+		my $idx = shift;
+		if ($idx >= 0 && $idx <= $#$names) {
+			my $length = length $names->[$idx];
+			my $n = $ncol - (($length < $max ? $length : $max) + 2);
+			$n -= ($idx > 0) && ($idx < $#$names);
+			if ($n > 0) {
+				$ncol = $n;
+				return 1;
+			}
+		}
+		0
 	};
 
-	my $i = 0;
-	for (my $keep_going = 1; $keep_going && $i < @$names; ++$i) {
-		$ncol -= $len->($i);
-		$keep_going = !$i || $root->{tabs}[$i - 1] != $root->{cur};
+	if ($try_add->($last_idx + 1)) {
+		++$last_idx;
+	}
+	while ($try_add->($first_idx - 1)) {
+		--$first_idx;
+	}
+	while ($try_add->($last_idx + 1)) {
+		++$last_idx;
 	}
 
-	if ($i < @$names) {
-		--$ncol;  # Reserve character for right arrow.
+	($first_idx, $last_idx)
+}
+
+# Truncates names of the tabs so that all tabs visible in the tabbar (specified
+# by the [$first_idx..$last_idx] range) can all fit.  Tries to keep as much of
+# the names of all tabs as possible.
+sub _tabbar_truncate_names {
+	my ($root, $ncol, $new_button, $names, $first_idx, $last_idx) = @_;
+
+	$ncol -= (3 * ($last_idx - $first_idx) + 2 +  # pipes and marks
+	          ($first_idx > 0 && !$new_button) +  # left arrow
+	          ($last_idx < $#$names));  # right arrow
+	my $max = int($ncol / ($last_idx - $first_idx + 1));
+	my $cur_max = $max;
+
+	if ($max > 0 && $first_idx < $last_idx) {
+		my @lengths = sort { $b <=> $a }
+		              grep { $_ <= $max ? (($ncol -= $_), 0) : 1 }
+		              map  length, @{ $names }[$first_idx .. $last_idx];
+		while (@lengths &&
+		       $lengths[$#lengths] <= ($max = int($ncol / @lengths))) {
+			do {
+				$ncol -= pop @lengths;
+			} while (@lengths && $lengths[$#lengths] <= $max);
+		}
+		$cur_max = $max + $ncol - $max * @lengths;
 	}
 
-	my $first = 0;
-	if ($ncol < 0) {
-		# If NEW button is not shown, reserve characte for left arrow.
-		$ncol += $len->($first++) - !$root->{new_button};
-		while ($ncol < 0) {
-			$ncol += $len->($first++);
+	for my $idx ($first_idx .. $last_idx) {
+		my $width = $root->{cur} == $root->{tabs}[$idx]
+			? $cur_max : $max;
+		if (length(my $name = $names->[$idx]) <= $width) {
+			# nop
+		} elsif ($width >= 2) {
+			$names->[$idx] = '…' . substr $name, -($width - 1);
+		} elsif ($width >= 1) {
+			$names->[$idx] = substr $name, -1;
+		} else {  # extremely narrow window
+			$names->[$idx] = '';
 		}
 	}
-
-	while ($i < @$names && ($ncol -= $len->($i)) >= 0) {
-		++$i;
-	}
-
-	if ($i == $#$names && $ncol == -1) {
-		# If we’re left with only the last tab and we’re missing one
-		# character, we can use the space we reserved for right arrow.
-		++$i;
-	}
-
-	($first, $i - 1)
 }
 
-# Determines largest tab name length limit which guarantees that all tabs in
-# given range can be displayed in the tabbar.
-sub _best_max_width($$$$) {
-	my ($ncol, $names, $first, $last) = @_;
+# Determines layout of the tabbar.  Returns a ($new_button, $first_idx,
+# $last_idx, \@names) list where:
+# - $new_button specifies text of the NEW button or is an empty string,
+# - $first_idx is an index of the first visible tab,
+# - $last_idx is an index of the last visible tab and
+# - \@names is an array of (possibly truncated) names of the tabs.
+sub _tabbar_layout {
+	my ($root) = @_;
 
-	$ncol -= 3 * ($last - $first) + 2;
-	my $max = int($ncol / ($last - $first + 1));
-	my @lens = sort { $a <=> $b }
-	           grep { if ($_ <= $max) { $ncol -= $_; 0 } else { 1 } }
-	           map  { length }
-	           @{ $names }[$first .. $last];
-	while (@lens) {
-		$max = int($ncol / @lens);
-		last if $lens[0] > $max;
-		do {
-			$ncol -= shift @lens;
-		} while (@lens && $lens[0] <= $max);
+	my $ncol = $root->ncol;
+	my $new_button = '';
+	if ($root->{new_button}) {
+		if ($ncol >= 60) {
+			$new_button = '[NEW]';
+		} elsif ($ncol >= 30) {
+			$new_button = 'NEW';
+		} elsif ($ncol >= 13) {
+			$new_button = '+';
+		}
 	}
-	$max;
-}
+	$ncol -= !!$new_button + length $new_button;
 
-# Collects names of all the tabs and figures out how much of a tab name can be
-# shown and how many tabs must be omitted.  Returns three values, ($first,
-# $last, \@names), where:
-# - $first is index of the first tab which should be displayed,
-# - $last is index of the last tab which should be displayed and
-# - \@names is an array of (possibly truncated) names of visible tabs.
-# The method takes one argument $ncol which is space available to display tabs.
-sub _size_tabs_for_refresh {
-	my ($root, $ncol) = @_;
-
-	# Construct array of lengths.
-	my $total = -1;
+	my $max = int(($ncol - 1) / 3) - 3;
+	$max = $max < 2 ? 1 : $max;
+	my ($total_truncated, $total_full, $cur_idx) = (-1, -1);
 	my @names = map {
-		my $name = $root->{tabs}[$_]{name} || '' . ($_ + 1);
-		$total += 3 + length $name;
+		my $tab = $root->{tabs}[$_];
+		if ($tab == $root->{cur}) {
+			$cur_idx = $_;
+		}
+		my $name      = $tab->{name} || '' . ($_ + 1);
+		my $length    = length $name;
+		$total_full      += 3 + $length;
+		$total_truncated += 3 + ($length < $max ? $length : $max);
 		$name
 	} 0..$#{ $root->{tabs} };
 
-	my ($first, $last) = (0, $#names);
-	if ($total > $ncol) {
-		if (@names > 3) {
-			($first, $last) = $root->_tabbar_span($ncol, \@names);
+	my ($first_idx, $last_idx) = (0, $#names);
+	if ($ncol < $total_full) {
+		if ($ncol < $total_truncated) {
+			($first_idx, $last_idx) = $root->_tabbar_range(
+				$ncol, !!$new_button, \@names, $cur_idx);
 		}
-		my $max = _best_max_width $ncol, \@names, $first, $last;
-		if ($max < 2) {
-			for my $n (@names[$first..$last]) {
-				$n = substr $n, -1;
-			}
-		} else {
-			for my $n (@names[$first..$last]) {
-				if ($max < length($n)) {
-					$n = '…' . substr $n, -($max - 1);
-				}
-			}
-		}
+		$root->_tabbar_truncate_names(
+			$ncol, !!$new_button, \@names, $first_idx, $last_idx);
 	}
-	($first, $last, \@names)
+
+	($new_button, $first_idx, $last_idx, \@names)
 }
 
 sub min {
@@ -696,24 +718,16 @@ sub refresh {
 		$root->copy_properties;
 	}
 	if (!$visible) {
-		$root->{timer}->stop;
 		return;
 	}
 
+	my ($new_button, $first_idx, $last_idx, $names) = $root->_tabbar_layout;
 	my $bar = new urxvt::ext::tabbedex::tabbar($root);
 
-	if ($root->{new_button}) {
-		my $str = '[NEW]';
-		if ($root->ncol <= 60) {
-			$str = $root->ncol <= 30 ? '+' : 'NEW';
-		}
-		$bar->add_button($str, 1, -1);
+	if ($new_button) {
+		$bar->add_button($new_button, 1, -1);
 	}
-
-	my ($idx, $last, $names) = $root->_size_tabs_for_refresh(
-		$bar->space_left);
-
-	if ($idx) {
+	if ($first_idx) {
 		$bar->add_arrow(-1);
 	}
 
@@ -721,21 +735,21 @@ sub refresh {
 		$now = urxvt::NOW;
 	}
 	my $min_delay;
-	for (; $idx <= $last; ++$idx) {
-		my $name = $names->[$idx];
+	for my $idx ($first_idx .. $last_idx) {
 		my $tab = $root->{tabs}[$idx];
-		my $color_idx = ($tab == $root->{cur}) +
-			2 * ($now < $tab->{bell_ends});
-		my ($left, $right, $delay) = $root->tab_activity_marks(
-			$tab, $now);
-		$bar->add_button($left . $name . $right, $color_idx, $idx);
+		my ($left, $right, $delay) =
+			$root->tab_activity_marks($tab, $now);
+		$bar->add_button(
+			$left . $names->[$idx] . $right,
+			($tab == $root->{cur}) + 2 * ($now < $tab->{bell_ends}),
+			$idx);
 		if ($tab->is_being_renamed) {
 			$bar->put_cursor(-2);
 		}
 		$min_delay = min $min_delay, $delay, $tab->{bell_ends} - $now;
 	}
 
-	if ($idx < @{ $root->{tabs} }) {
+	if ($last_idx < $#$names) {
 		$bar->add_arrow(1);
 	}
 
