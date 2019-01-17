@@ -88,7 +88,7 @@ This can be configured using a C<tabbedex-rs-prefix> resource, for example:
     URxvt.tabbed.tabbedex-rs-prefix: %
 
     ! Affects tabbed plugin only:
-    URxvt.tabbed.tabbar-fg:
+    URxvt.tabbed.tabbar-fg: 4
     URxvt.tabbed.tabbar-bg: 0
 
     ! Affects tabbedex plugin only:
@@ -1595,8 +1595,13 @@ sub put_cursor {
 sub apply {
 	my ($bar) = @_;
 	$bar->{pipe_pending} = 0;
-	$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}),
-	              $bar->{pad_colour});
+	if ($bar->{ncol} > length $bar->{text}) {
+		$bar->_append(' ' x ($bar->{ncol} - length $bar->{text}),
+		              $bar->{pad_colour});
+	} elsif ($bar->{ncol} < length $bar->{text}) {
+		$bar->{text} = substr $bar->{text}, 0, $bar->{ncol};
+		splice @{ $bar->{rend} }, $bar->{ncol};
+	}
 	my ($term, $cur) = ($bar->{root}{term}, $bar->{cursor});
 	$term->cmd_parse(defined($cur) ? "\e[1;${cur}f\e[?25h" : "\e[?25l");
 	$term->ROW_t(0, $bar->{text});
