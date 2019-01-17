@@ -748,7 +748,7 @@ sub refresh {
 		$bar->add_arrow(1);
 	}
 
-	if ($root->{tab_title} && $bar->space_left) {
+	if ($root->{tab_title} && $bar->space_left > 0) {
 		my @str = $root->XGetWindowProperty(
 			$root->parent, $root->{tab_title});
 		if (@str && $str[2]) {
@@ -1565,7 +1565,7 @@ sub add_title {
 	my ($bar, $text) = @_;
 
 	my $available = $bar->space_left;
-	if (!$available) {
+	if ($available <= 0) {
 		return;
 	}
 
