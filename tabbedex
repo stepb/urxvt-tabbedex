@@ -1163,6 +1163,7 @@ sub tab_destroy {
 		if (!$root->{reopen_on_close}) {
 			# Delay destruction a tiny bit.
 			$root->{destroy} = urxvt::iw->new->start->cb(sub {
+				$root->{timer}->stop;
 				$root->destroy;
 			});
 			return ();
