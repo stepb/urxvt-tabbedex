@@ -69,7 +69,7 @@ tmp=$(mktemp -d)
 trap 'rm -r -- "$tmp"' 0
 
 git archive --format=tar --prefix="$pkg/" "$master" | tar xC "$tmp" \
-	--exclude=.gitignore --exclude=install --exclude=\*cut-a-release\*
+	--exclude=.gitignore --exclude=install --exclude=package
 
 mkdir -- "$tmp/$pkg/experimental"
 git format-patch -o "$tmp/$pkg/experimental" "$master".."$experimental" >/dev/null
