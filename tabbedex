@@ -530,7 +530,6 @@ use Encode qw(decode);
 	sub enable_hooks {
 		my ($root) = @_;
 		$root->enable(%hooks);
-		undef %hooks;
 	}
 }
 
