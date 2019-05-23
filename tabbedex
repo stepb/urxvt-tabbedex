@@ -1,7 +1,7 @@
 #! perl
 # TabbedEx plugin for rxvt-unicode; based on original tabbed plugin.
 # https://github.com/mina86/urxvt-tabbedex
-# Copyright (c) 2006-2018 tabbed and tabbedex authors
+# Copyright 2006-2019 tabbed and tabbedex authors
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,23 +22,20 @@ tabbedex - tabbed interface to urxvt; extended
 
 =head1 DESCRIPTION
 
-This transforms the terminal into a tabbar with additional terminals, that is,
-it implements what is commonly referred to as "tabbed terminal".  tabbedex is an
-extended version of the tabbed plugin which comes with urxvt.
+This extension implements a tabbed terminal.  Once rxvt-unicode starts, slave
+terminals can be started in their own tabs and switched between.  At each point
+only one terminal is visible.  rxvt-unicode exits once all tabs are closed.
 
-When rxvt-unicode is started with this plugin slave terminals or tabs can be
-started and switched between.  One of the terminals is the current or active one
-and it is the only one that is visible.  rxvt-unicode will exit once all tabs
-are closed.
+Once at least two tabs are created a tab bar is displayed at the top of the
+window which lists all the slave terminals.  Clicking on a number/name of a tab
+on that bar switches to it.
 
-Once at least two slave terminals are created a tab bar is displayed at the top
-of the window which lists all the slave terminals.  Clicking on a number/name of
-a tab on that bar switches to given tab.
+tabbedex is an extended version of the tabbed plugin distributed with urxvt.
 
 =head2 Key bindings
 
-Creating new tabs, switching between them and moving them around is accomblished
-by the following key bindings:
+Creating new tabs, switching between them and moving them around can be
+performed through the following key bindings:
 
 =over
 
@@ -69,9 +66,8 @@ Ctrl+C aborts the rename operation and Enter accepts the new name.
 
 =back
 
-Note that those default key bindings can be disabled, using B<no-tabbedex-keys>
-resource (see below), and replaced with custom ones using urxvt's B<keysym>
-resource.
+Default key bindings can be disabled using B<no-tabbedex-keys> resource (see
+below) and replaced with custom ones using urxvt's B<keysym> resource.
 
 =head1 CONFIGURATION
 
@@ -169,8 +165,8 @@ Replaced by properly quoted I<-e B<command>> arguments if they were given when
 urxvt was started or an empty string otherwise.  See also I<%E> which may be
 easier for some uses.
 
-Note: if neither I<%e> nor I<%E> is present value of the resource, I<-e> switch
-passed when running urxvt will be completely ignored.
+Remember that if neither I<%e> nor I<%E> is used, I<-e> switch passed when
+starting urxvt will be completely ignored.
 
 =item I<%E>
 
@@ -391,7 +387,7 @@ L<tabbedex-pgid-cd(1)>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2018 tabbed and tabbedex authors
+Copyright 2006-2019 tabbed and tabbedex authors
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
