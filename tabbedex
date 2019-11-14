@@ -370,7 +370,7 @@ tabbedex supports a single OSC sequence which can be invoked by programs running
 in the terminal by writing a special sequence, namely I<ESC ] 777 ; string ST>
 where I<string> is the command to execute.  For example:
 
-    printf '\033]777;tabbedx;set_tab_name;%s\007' "foo"
+    printf '\033]777;tabbedex;set_tab_name;%s\007' "foo"
 
 =over
 
@@ -1300,7 +1300,8 @@ sub move_tab {
 sub tab_osc_seq_perl {
 	my ($root, $tab, $osc) = @_;
 
-	if ($osc =~ /^tabbedx;set_tab_name;(.*)$/) {
+	# For historical reasons, we also accept misspelled "tabbedx" prefix.
+	if ($osc =~ /^tabbede?x;set_tab_name;(.*)$/) {
 		my $name = $root->locale_decode($1);
 		if ($tab->set_name($root->special_encode($name))) {
 			$root->refresh;
