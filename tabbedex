@@ -527,10 +527,8 @@ use Encode qw(decode);
 
 
 sub warn {
-	my ($root, $msg) = @_;
-	$root = shift;
-	my $extname = $root->{_name} // 'tabbedex';
-	urxvt::warn($extname . ': ' . join('', @_) . "\n");
+	my $root = shift;
+	urxvt::warn(join '', $root->{_name} // 'tabbedex', ': ', @_, "\n");
 }
 
 
