@@ -1056,10 +1056,8 @@ sub init {
    $root->{reopen_on_close}  = $rs->bool('reopen-on-close', 0);
    $root->{tab_arguments}    = $rs->text('tab-arguments', '');
 
-   # TODO: Warning added on 2018/08/04.  Eventually remove ‘!defined
-   # tab-arguments’ condition and then the whole warning.
-   if (defined $rs->text('new-tab-command') &&
-       !defined $rs->text('tab-arguments')) {
+   # TODO: Remove the warning in late 2020.
+   if (defined $rs->text('new-tab-command')) {
       $root->warn('‘new-tab-command’ resource is no longer recognised; ',
                   'use ‘tab-arguments’ instead');
    }
