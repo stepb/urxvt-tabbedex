@@ -902,12 +902,19 @@ sub copy_properties {
 sub make_current {
 	my ($root, $tab, $bell_ends) = @_;
 
+	if (!ref $tab) {
+		$tab = $root->{tabs}[$tab];
+	}
+
 	my $cur = $root->{cur};
 	if ($cur == $tab) {
 		return;
 	}
 
 	if ($cur) {
+		if ($cur->is_being_renamed) {
+			return;
+		}
 		delete $cur->{last_activity};
 		$cur->{bell_ends} = 0;
 		$cur->XUnmapWindow ($cur->parent) if $cur->mapped;
@@ -981,7 +988,7 @@ _on button_release => sub {
 	my ($root, $event) = @_;
 
 	if ($root->{cur}->is_being_renamed || $event->{row} != 0 ||
-	   $event->{button} != 1) {
+	    $event->{button} != 1) {
 		return ();
 	}
 
@@ -994,7 +1001,7 @@ _on button_release => sub {
 		} elsif ($button->[2] == -1) {
 			$root->new_tab($root->{cur});
 		} else {
-			$root->make_current($root->{tabs}[$button->[2]]);
+			$root->make_current($button->[2]);
 		}
 	}
 	1;
@@ -1160,8 +1167,7 @@ sub tab_destroy {
 
 	if ($root->{cur} == $tab) {
 		delete $root->{cur};
-		$idx = $idx < @{ $root->{tabs} } ? $idx : -1;
-		$root->make_current($root->{tabs}[$idx]);
+		$root->make_current($idx < @{ $root->{tabs} } ? $idx : -1);
 	} else {
 		$root->refresh;
 	}
@@ -1232,19 +1238,16 @@ sub tab_action {
 			$root->new_tab($tab, $2, $index);
 		}
 	} elsif ($cmd eq 'next_tab') {
-		$root->change_tab($tab, 1);
+		$root->make_current(($tab->index + 1) % @{ $root->{tabs} });
 	} elsif ($cmd eq 'prev_tab') {
-		$root->change_tab($tab, -1);
+		$root->make_current($tab->index - 1);
 	} elsif ($cmd eq 'move_tab_left') {
 		$root->move_tab($tab, -1);
 	} elsif ($cmd eq 'move_tab_right') {
 		$root->move_tab($tab, 1);
-	} elsif ($cmd =~ /^goto_tab[_:](-?\d+)$/) {
-		if ($1 != 0 && !$root->{cur}->is_being_renamed && @{ $root->{tabs} } > 1) {
-			my $idx = $1 > 0 ? ($1 - 1) : (@{ $root->{tabs} } + $1);
-			if ($idx >= 0 && $idx < @{ $root->{tabs} }) {
-				$root->make_current ($root->{tabs}[$idx]);
-			}
+	} elsif ($cmd =~ /^goto_tab[_:](-?)(0*[1-9]\d*)$/) {
+		if ($2 <= @{ $root->{tabs} }) {
+			$root->make_current($1 eq '' ? $2 - 1 : -$2);
 		}
 	} elsif ($cmd eq 'rename_tab') {
 		if ($tab == $root->{cur} && $tab->start_rename_tab) {
@@ -1256,17 +1259,6 @@ sub tab_action {
 		$root->warn('unrecognised action: ‘', $cmd, '’; ignoring');
 	}
 	()
-}
-
-sub change_tab {
-    my ($root, $tab, $direction) = @_;
-
-    if (!$root->{cur}->is_being_renamed && @{ $root->{tabs} } > 1) {
-        my $idx = $tab->index + $direction;
-        $root->make_current ($root->{tabs}[$idx % @{ $root->{tabs}}]);
-    }
-
-    ();
 }
 
 sub move_tab {
