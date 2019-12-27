@@ -541,14 +541,11 @@ sub tab_activity_marks {
 	my $prev;
 	for my $spec (@{ $root->{timeouts} }) {
 		my ($time, $left, $right) = @$spec;
-		if ($diff < $time) {
-			$prev = $time;
-		} elsif (wantarray) {
+		if ($diff >= $time) {
 			my $next = defined $prev ? $prev - $diff : undef;
 			return ($left, $right, $next);
-		} else {
-			return $left . $right;
 		}
+		$prev = $time;
 	}
 	('!', '!')  # we should never be here
 }
@@ -1013,12 +1010,10 @@ _on button_release => sub {
 my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
 
 sub parse_timeouts {
-	my $root = shift;
-	my $timeouts = shift // '';
-	my $re = qr/(?:\d+)?\.\d+|\d+/;
-	$re = eval { qr/\G($re):(\X)(?::|$)/ } // qr/\G($re):(.)(?::|$)/;
+	my ($root, $timeouts) = @_;
+	my $single_char = eval { qr/\X/ } // qr/./;
 	my @timeouts;
-	while ($timeouts =~ /$re/g) {
+	while ($timeouts =~ /\G(\d*\.\d+|\d+):($single_char)(?::|$)/g) {
 		my $left = $root->special_encode($2);
 		push @timeouts, [$1 + 0, $left, $matching_marks{$2} // $left];
 	}
@@ -1217,9 +1212,10 @@ sub tab_add_lines {
 	my ($root, $tab) = @_;
 	if ($tab != $root->{cur}) {
 		my $now = urxvt::NOW;
-		my $mark = $root->tab_activity_marks($tab, $now);
+		my @pre = $root->tab_activity_marks($tab, $now);
 		$tab->{last_activity} = $now;
-		if ($mark ne $root->tab_activity_marks($tab, $now)) {
+		my @post = $root->tab_activity_marks($tab, $now);
+		if ($pre[0] ne $post[0] || $pre[1] ne $post[1]) {
 			$root->refresh($now);
 		}
 	}
