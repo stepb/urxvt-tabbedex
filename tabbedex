@@ -255,11 +255,17 @@ since last time there was any activity in the tab.
 
 This resource allows for this to be customised.  It's format is
 
-    ( <timeout> ":" <character> ":" )* <timeout> ":" <character> ":"
+    ( <timeout> ":" <char> <char>? ":" )* <timeout> ":" <char> <char>? ":"
 
-where <timeout> is timeout in seconds and <character> is a single activity
-character.  If activity character is (, [, { or < it will be used as left
-activity mark and matching character will be used on the right side.
+where <timeout> is timeout in seconds and <char> is an activity character.  If
+two characters are given, they specify left and right activity marks.  If one
+character is given, it specifies both.  For example:
+
+    URxvt.tabbedex.tabbar-timeouts: 0:|:3:():6:[]:9:{}:12:<>
+
+As a deprecated feature, if a single character is given and it's (, [, { or <,
+matching closing brace will be used for right activity mark.  This is feature
+will be removed in the future.
 
 =item B<tabbed.tabbedex-rs-prefix>: I<string>
 
@@ -1008,15 +1014,19 @@ _on button_release => sub {
 
 {
 
+# TODO: Add a warning in late 2020 or thereabouts if this is used and then
+# remove completely a year later or such.
 my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
 
 sub parse_timeouts {
 	my ($root, $timeouts) = @_;
-	my $single_char = eval { qr/\X/ } // qr/./;
+	my $char = eval { qr/\X/ } // qr/./;
 	my @timeouts;
-	while ($timeouts =~ /\G(\d*\.\d+|\d+):($single_char)(?::|$)/g) {
+	while ($timeouts =~ /\G(\d*\.\d+|\d+):($char)($char)?(?::|$)/g) {
 		my $left = $root->special_encode($2);
-		push @timeouts, [$1 + 0, $left, $matching_marks{$2} // $left];
+		my $right = $root->special_encode(
+			$3 // $matching_marks{$2} // $2);
+		push @timeouts, [$1 + 0, $left, $right];
 	}
 	@timeouts = sort { $b->[0] <=> $a->[0] } @timeouts;
 	if (!@timeouts || $timeouts[$#timeouts][0] > 0) {
