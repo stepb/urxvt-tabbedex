@@ -1438,14 +1438,14 @@ sub text {
 	my ($rs, $name, $default) = @_;
 	my ($root, $extname, $prefix) = @$rs;
 	my $value = $root->x_resource("%.$name");
-	if (defined $value || !defined $prefix ||
-	    !defined($value = $root->x_resource("$prefix.$name"))) {
-		return $value // $default;
+	if (!defined $value && defined $prefix) {
+		$value = $root->x_resource("$prefix.$name");
+		if (defined $value) {
+			$root->warn("‘$prefix.$name’ resource uses deprecated " .
+			            "prefix. Use ‘$extname.$name’ instead.");
+		}
 	}
-
-	$root->warn("‘$prefix.$name’ resource uses deprecated prefix.  " .
-	            "Use ‘$extname.$name’ instead.");
-	return $value;
+	defined $value ? $root->locale_decode($value) : $default
 }
 
 sub bool {
