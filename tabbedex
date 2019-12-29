@@ -177,7 +177,8 @@ or I</bin/sh> if that's empty.  This means that I<%E> is always a valid command.
 For example, here's how the sequence can be used to set TABBEDEX_NUM environment
 variables when running a command:
 
-    URxvt.tabbedex.tab-arguments: -e /usr/bin/env TABBEDEX_NUM=%n %E
+    URxvt.tabbedex.tab-arguments: \
+        -e /usr/bin/env TABBEDEX_NUM=%n %E
 
 =item I<%n>
 
