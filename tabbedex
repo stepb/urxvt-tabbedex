@@ -1151,11 +1151,6 @@ sub tab_start {
 sub tab_destroy {
 	my ($root, $tab) = @_;
 
-	# If the tab is being renamed, stop renaming first.
-	if ($tab->is_being_renamed) {
-		$tab->finish_rename_tab(0);
-	}
-
 	my $idx = $tab->index;
 	splice @{ $root->{tabs} }, $idx, 1;
 
@@ -1371,8 +1366,6 @@ sub finish_rename_tab {
 	}
 	delete $tab->{old_name};
 	$tab->disable('key_press');
-
-	$tab->{root}->refresh;
 }
 
 sub set_name {
