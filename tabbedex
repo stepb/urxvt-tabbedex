@@ -1554,19 +1554,12 @@ sub add_button {
 
 sub add_title {
 	my ($bar, $text) = @_;
-
-	my $available = $bar->space_left;
-	if ($available <= 0) {
-		return;
-	}
-
 	$bar->_append_pending_pipe_maybe;
+	my $available = $bar->space_left;
 	if (length $text < $available) {
 		$text = ' ' . $text;
-	} elsif ($available == 1) {
-		$text = substr $text, 0, 1;
-	} else {
-		$text = (substr $text, 0, $available - 1) . '…';
+	} elsif (length $text > $available && $available > 1) {
+		substr($text, $available - 1) = '…';
 	}
 	$bar->_append($text, 4);
 	$bar->{pad_colour} = 4;
