@@ -77,7 +77,7 @@ git format-patch -o "$tmp/$pkg/experimental" "$master".."$experimental" >/dev/nu
 echo "$version" >$tmp/$pkg/.version
 
 mkdir -- "$tmp/$pkg/release-notes"
-for tag in $(g tag | grep -o '^v[1-9][0-9]\.[0-9][0-9][0-9]$'); do
+for tag in $(git tag | grep -o '^v[1-9][0-9]\.[0-9][0-9].*'); do
 	git cat-file tag $tag | sed '1,/^$/d' >$tmp/$pkg/release-notes/$tag.txt
 done
 
