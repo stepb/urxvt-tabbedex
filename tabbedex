@@ -801,7 +801,7 @@ sub args_percent_substitution {
 		quote_words @{ $root->{argv} }
 	} elsif ($ch eq 'E') {
 		quote_words @{ $root->{argv} }
-			? @{ $root->{argv} }[1..$#$root->{argv}]
+			? @{ $root->{argv} }[1..$#{ $root->{argv} }]
 			: ($ENV{SHELL} || '/bin/sh')
 	} elsif ($ch eq 'p') {
 		$tab ? $tab->foreground_pgid : -1
