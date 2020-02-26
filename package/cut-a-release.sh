@@ -30,12 +30,12 @@ while [ $# -gt 0 ]; do
 	?:-f|?:--force)   noclobber=false ;;
 	?:-n|?:--dry-run) dry="echo >" ;;
 	?:-p?*)           patchlevel=${1#-?} ;;
-	0:?*)
+	0:[!-]*)
 		master=$1
 		experimental=HEAD
 		n=1
 		;;
-	1:?*)
+	1:[!-]*)
 		experimental=$1
 		n=2
 		;;
