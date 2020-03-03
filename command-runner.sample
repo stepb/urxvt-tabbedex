@@ -1,0 +1,91 @@
+#!/bin/sh
+: <<'=cut'
+
+=head1 NAME
+
+command-runner.sample - example script for use with tabbedex tab-arguments
+
+=head1 SYNOPSIS
+
+command-runner.sample I<id> I<command> [ I<arguments> ... ]
+
+=head1 DESCRIPTION
+
+Runs a predefined commands identified by I<id> or I<command> if I<id> doesn't
+match any.  Predefined commands are hard-coded in the source code of this
+script.
+
+=head1 OPTIONS
+
+=over
+
+=item I<id>
+
+Identifier of a predefined command to run.  Typically a zero-indexed integer.
+
+=item I<command> [ I<arguments> ... ]
+
+Command to execute if I<id> does not match any know predefined command.
+
+=back
+
+=head1 TABBEDEX
+
+The script is designed to work with tabbedex urxvt plugin (and showcase its
+I<tab-arguments> configuration resource).  It can be used to execute different
+commands in different tabs.  To use it, copy it and edit list of commands at the
+end of the file.  Provided urxvt-tabbedex is installed in B</usr/lib/urxvt>, the
+following steps are a good start:
+
+    mkdir -p ~/.urxvt
+    cp /usr/lib/urxvt/tabbedex-command-runner.sample \
+       ~/.urxvt/command-runner.sh
+    ${VISUAL:-${EDITOR:-/bin/vi}} ~/.urxvt/command-runner.sh
+
+Finally, configure B<tab-arguments> resource, for example:
+
+    URxvt.tabbedex.tab-arguments: \
+        -e /bin/sh %~/.urxvt/command-runner.sh %n %E
+
+With this done, each time new tab is started, this script will be run so that it
+can decide what actual command is executed in the tab.
+
+To use this script in conjunction with B<pgid-cd.pl> tool also packaged with
+urxvt-tabbedex, the resource should be:
+
+    URxvt.tabbedex.tab-arguments: \
+        -e /usr/lib/urxvt/tabbadex-pgid-cd %p \
+        /bin/sh %~/.urxvt/command-runner.sh %n %e
+
+(modulo the actual location of the files).
+
+=head1 SEE ALSO
+
+L<urxvt-tabbed(1)> and L<tabbedex-pgid-cd(1)>
+
+=cut
+
+trap 'echo "Press RETURN to continue." >&2 && read && exit 1' 0
+if [ $# -lt 2 ]; then
+	echo "usage: /bin/sh ${0##*/} <id> <command> [ <args> ... ]" >&2
+	exit 1
+fi
+
+id=$1
+shift
+
+#### Predefined commands ####
+
+case $id in
+0) # First tab is shell
+	exec "${SHELL:-bash}"
+	;;
+1) # Second tab is Emacs
+	exec emacs -nw
+	;;
+2) # In third, let’s tail /var/log/syslog
+	exec tail -f /var/log/syslog
+	;;
+*) # If nothing matches, run whatever was given as an argument
+	exec "$@"
+esac
