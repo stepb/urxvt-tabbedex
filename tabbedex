@@ -944,6 +944,7 @@ sub make_current {
 		if ($cur->is_being_renamed) {
 			return;
 		}
+		$cur->enable_activity_hook(1);
 		delete $cur->{last_activity};
 		$cur->{bell_ends} = 0;
 		$cur->XUnmapWindow ($cur->parent) if $cur->mapped;
@@ -951,6 +952,10 @@ sub make_current {
 	}
 
 	$root->{cur} = $tab;
+	# Disable the add_lines hook so that we don’t waste time processing that
+	# hook for the current tab.  We’re not interested in that hook on the
+	# current tab.
+	$tab->enable_activity_hook(0);
 
 	$root->configure;
 	$root->copy_properties;
@@ -1254,11 +1259,10 @@ sub tab_bell {
 sub tab_line_update {
 	my ($root, $tab, $row) = @_;
 	my $ignore = $tab->{ignore_line_activity} // 0;
-	# 0 ≤ $row < nrow thus if $ignore is zero the second part of the
-	# condition will always be true.  Otherwise, the two conjuncts handle
-	# checks for when $ignore is positive and negative respectively.
-	if ($tab != $root->{cur} &&
-	    ($row + 1 != $ignore && $tab->nrow + $ignore != $row)) {
+	# 0 ≤ $row < nrow thus if $ignore is zero the condition is always true.
+	# Otherwise, the two tests handle checks for when $ignore is positive
+	# and negative respectively.
+	if ($row + 1 != $ignore && $tab->nrow + $ignore != $row) {
 		my $now = urxvt::NOW;
 		my @pre = $root->tab_activity_marks($tab, $now);
 		$tab->{last_activity} = $now;
@@ -1267,7 +1271,7 @@ sub tab_line_update {
 			$root->refresh($now);
 		}
 	}
-	();
+	()
 }
 
 
@@ -1354,15 +1358,28 @@ use POSIX qw/tcgetpgrp/;
 # simply proxies all interesting calls back to the tabbedex class.
 
 
-sub enable_hooks {
-	for my $hook (qw(start destroy property_notify line_update
-	                 bell osc_seq_perl)) {
-		my $name = "urxvt::ext::tabbedex::root::tab_$hook";
-		$_[0]->enable($hook => sub {
+{
+	my %hooks = map {
+		my $name = "urxvt::ext::tabbedex::root::tab_$_";
+		$_ => sub {
 			unshift @_, $_[0]{root};
 			goto &$name;
-		});
-	};
+		}
+	} qw(start destroy property_notify line_update bell osc_seq_perl);
+
+	sub enable_hooks {
+		my ($root) = @_;
+		$root->enable(%hooks);
+	}
+
+	sub enable_activity_hook {
+		my ($tab, $enable) = (@_, 1);
+		if ($enable) {
+			$tab->enable(line_update => $hooks{line_update});
+		} else {
+			$tab->disable('line_update');
+		}
+	}
 }
 
 sub init {
