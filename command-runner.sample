@@ -74,16 +74,23 @@ fi
 id=$1
 shift
 
+set_tab_name() {
+	printf '\033]777;tabbedex;set_tab_name;%s\007' "$1"
+}
+
 #### Predefined commands ####
 
 case $id in
 0) # First tab is shell
+	set_tab_name sh
 	exec "${SHELL:-bash}"
 	;;
 1) # Second tab is Emacs
+	set_tab_name ed
 	exec emacs -nw
 	;;
 2) # In third, let’s tail /var/log/syslog
+	set_tab_name log
 	exec tail -f /var/log/syslog
 	;;
 *) # If nothing matches, run whatever was given as an argument
