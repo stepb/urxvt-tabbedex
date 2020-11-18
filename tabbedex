@@ -107,10 +107,10 @@ current tab's title will be displayed after the last tab.
 
 =item B<title-fg>:    [I<style>] I<colour>  and  B<title-bg>:    I<colour>
 
-Foreground and background styles of respectively: the tab bar (including
-inactive tabs), the current/active tab on the tab bar and new button, an
-inactive tab on which bell has rung, an active tab on which bell has rung and
-finally the tab title.
+Foreground and background styles of elements of the tab bar, respectively: 1)
+the tab bar including background tabs, 2) the current tab and new button, 3)
+a background tab on which bell has rung, 4) the current tab if bell has rung and
+5) tab title.
 
 Colours can be specified as: I<-2> meaning default foreground, I<-1> meaning
 default background, an integer between B<0> and B<255> specifying index in
@@ -190,8 +190,8 @@ starts at zero and always increments for each subsequent tab.
 
 Replaced by ID of a process group which is running in foreground of the pseudo
 terminal in the current tab (as in, not the new tab being created but the tab
-where the new tab request originated from) or -1 if there are no active tabs (or
-that information could not be determined).
+where the new tab request originated from) or -1 if this piece of information
+could not be determined.
 
 This can be used to guess the current working directory of current tab.
 
@@ -206,8 +206,7 @@ Unrecognised sequences are replaced with an empty string.
 
 See B<command-runner.sample> file distributed with this extension for some ideas
 how this resource can be used to start different commands in different tabs or
-how to use the same current working directory for new tabs as the active tab
-has.
+how to start new tabs in the same working directory as the current tab is using.
 
 =item B<no-tabbedex-keys>: I<boolean>
 
@@ -248,8 +247,8 @@ If set, whenever last tab is destroyed a new one will be created.
 
 =item B<tabbar-timeouts>: I<string>
 
-When new text is written to an inactive tab, activity marks are displayed around
-its number (or name if it has one) on the tab bar.  By default Unicode
+When new text is written to a background tab, activity marks are displayed
+around its number (or name if it has one) on the tab bar.  By default Unicode
 characters are used to display a block which grows with time the longer it was
 since last time there was any activity in the tab.
 
@@ -278,7 +277,7 @@ used but a warning is issued as well, for example:
     URxvt.tabbedex.tabbar-fg: 4   -- used
 
 For best backwards compatibility, all options should use C<tabbedex> prefix and
-the <tabbedex-rs-prefix> resource should be to percent sign as in:
+the <tabbedex-rs-prefix> resource should be set to percent sign as in:
 
     URxvt.tabbed.tabbedex-rs-prefix: %
 
@@ -292,11 +291,11 @@ information about them).  The options include:
 
 =item B<mapAlert>
 
-If set, when bell rings in an inactive tab, the tab is made active.
+If set, when bell rings in a background tab, the tab is selected as current.
 
 =item B<urgentOnBell>
 
-If set, when bell rings in an inactive tab, the master terminal's urgency hint
+If set, when bell rings in a background tab, the master terminal's urgency hint
 is set.
 
 =back
