@@ -990,8 +990,24 @@ _on tt_write => sub {
 };
 
 _on key_press => sub {
-   my ($root, $event) = @_;
-   $root->key_event('key_press', $event);
+	my ($root, $event) = @_;
+
+	# This check fixes dead keys when pointer is not above the terminal
+	# window (see https://github.com/mina86/urxvt-tabbedex/issues/26).  The
+	# fix only works if ibus is used; if ibus is not used, the condition is
+	# always true.
+	#
+	# When a dead key is combined with a letter a key_press event with zero
+	# state, keycode and time is generated.  If we forward it to the tab and
+	# report back to urxvt that the event was handled, nothing happens and
+	# the character is not inserted.
+	#
+	# On the other hand, if we ignore such events everything works as
+	# expected.  To be honest, I don’t completely understand what is
+	# happening here, but it fixes stuff. — mina86
+	if ($event->{state} || $event->{keycode} || $event->{time}) {
+		$root->key_event('key_press', $event);
+	}
 };
 
 _on key_release => sub {
@@ -1001,6 +1017,7 @@ _on key_release => sub {
 
 sub key_event {
 	my ($root, $type, $event) = @_;
+
 	my $tab = $root->{cur};
 	$tab->$type($event->{state}, $event->{keycode}, $event->{time});
 
