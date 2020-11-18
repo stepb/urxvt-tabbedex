@@ -262,6 +262,8 @@ character is given, it specifies both.  For example:
 
     URxvt.tabbedex.tabbar-timeouts: 0:|:3:():6:[]:9:{}:12:<>
 
+See B<tabbedex;ignore_line_activity> OSC sequence below to see how the activity
+detection can be further affected.
 
 =item B<tabbed.tabbedex-rs-prefix>: I<string>
 
@@ -380,6 +382,33 @@ where I<string> is the command to execute.  For example:
 =item B<tabbedex;set_tab_name;>I<name>
 
 Sets name of the current tab to I<name>.
+
+=item B<tabbedex;ignore_line_activity;>I<n>
+
+Prevents new text on given line affecting activity marks displayed in the tab
+bar (see B<tabbar-timeouts> resource).  Positive values specify I<n>th row from
+the top, negative specify -I<n>th row from the bottom and zero disables the
+filtering (thus making all updates affect activity marks).
+
+This is useful if an application has a periodically-updating status line whose
+refresh does not indicate activity in the tab.  For example, L<screen(1)> can
+display current time in its hardstatus.  To prevent updates to the clock
+registering as activity in the screen window, tabbedex can be instructed to
+ignore the bottom row of the display:
+
+    printf '\033]777;tabbedex;ignore_line_activity;%d\007' -1
+
+To make this automatic a custom script for starting L<screen(1)> could be used:
+
+    #!/bin/sh
+    ignore_line_activity() {
+        printf '\033]777;tabbedex;ignore_line_activity;%d\007' "$1"
+    }
+    ignore_line_activity -1
+    screen "$@"
+    ignore_line_activity 0
+
+Note that if text wraps multiple lines, only the topmost row counts as changed.
 
 =back
 
@@ -1222,9 +1251,14 @@ sub tab_bell {
 }
 
 
-sub tab_add_lines {
-	my ($root, $tab) = @_;
-	if ($tab != $root->{cur}) {
+sub tab_line_update {
+	my ($root, $tab, $row) = @_;
+	my $ignore = $tab->{ignore_line_activity} // 0;
+	# 0 ≤ $row < nrow thus if $ignore is zero the second part of the
+	# condition will always be true.  Otherwise, the two conjuncts handle
+	# checks for when $ignore is positive and negative respectively.
+	if ($tab != $root->{cur} &&
+	    ($row + 1 != $ignore && $tab->nrow + $ignore != $row)) {
 		my $now = urxvt::NOW;
 		my @pre = $root->tab_activity_marks($tab, $now);
 		$tab->{last_activity} = $now;
@@ -1305,6 +1339,9 @@ sub tab_osc_seq_perl {
 			$root->refresh;
 		}
 		1;
+	} elsif ($osc =~ /^tabbedex;ignore_line_activity;(-?\d+)$/) {
+		$tab->{ignore_line_activity} = $1 + 0;
+		1;
 	}
 }
 
@@ -1318,7 +1355,7 @@ use POSIX qw/tcgetpgrp/;
 
 
 sub enable_hooks {
-	for my $hook (qw(start destroy property_notify add_lines
+	for my $hook (qw(start destroy property_notify line_update
 	                 bell osc_seq_perl)) {
 		my $name = "urxvt::ext::tabbedex::root::tab_$hook";
 		$_[0]->enable($hook => sub {
