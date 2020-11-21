@@ -73,6 +73,9 @@ git archive --format=tar --prefix="$pkg/" "$master" | tar xC "$tmp" \
 
 mkdir -- "$tmp/$pkg/experimental"
 git format-patch -o "$tmp/$pkg/experimental" "$master".."$experimental" >/dev/null
+if find "$tmp/$pkg/experimental" -maxdepth 0 -empty | grep -q .; then
+	rmdir -- "$tmp/$pkg/experimental"
+fi
 
 echo "$version" >$tmp/$pkg/.version
 
