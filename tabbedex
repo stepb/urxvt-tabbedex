@@ -268,15 +268,16 @@ detection can be further affected.
 =item B<tabbed.tabbedex-rs-prefix>: I<string>
 
 A B<deprecated> alternative resource name prefix.  It's always specified with
-C<tabbed> prefix which is also its default value.
+C<tabbed> prefix.
 
 If resource using extension's name as well as one using the alternate prefix are
 found, the former takes precedence.  If only the latter is present, its value is
 used but a warning is issued as well, for example:
 
+    URxvt.tabbed.tabbedex-rs-prefix: tabbed
+    URxvt.tabbedex.tabbar-fg: 4   -- used
     URxvt.tabbed.tabbar-fg:   5   -- ignored
     URxvt.tabbed.tabbar-bg:   0   -- used but issues a warning
-    URxvt.tabbedex.tabbar-fg: 4   -- used
 
 For best backwards compatibility, all options should use C<tabbedex> prefix and
 the <tabbedex-rs-prefix> resource should be set to percent sign as in:
@@ -1515,10 +1516,11 @@ package urxvt::ext::tabbedex::rs_reader;
 
 sub new {
 	my ($class, $root) = @_;
-	my $prefix = $root->x_resource('tabbed.tabbedex-rs-prefix') // 'tabbed';
+	# TODO: Stop respecting the $prefix in late 2022.
+	my $prefix = $root->x_resource('tabbed.tabbedex-rs-prefix');
 	my $extname = $root->{_name};
 	my $rs = [$root, $extname];
-	if ($prefix ne '%' && $prefix ne $extname) {
+	if (!defined $prefix || ($prefix ne '%' && $prefix ne $extname)) {
 		push @$rs, $prefix;
 	}
 	bless $rs, $class
@@ -1528,11 +1530,23 @@ sub text {
 	my ($rs, $name, $default) = @_;
 	my ($root, $extname, $prefix) = @$rs;
 	my $value = $root->x_resource("%.$name");
-	if (!defined $value && defined $prefix) {
+	if (defined $value) {
+		# nop
+	} elsif (defined $prefix) {
 		$value = $root->x_resource("$prefix.$name");
 		if (defined $value) {
-			$root->warn("‘$prefix.$name’ resource uses deprecated " .
-			            "prefix. Use ‘$extname.$name’ instead.");
+			$root->warn("‘$prefix.$name’ resource uses " .
+			            "deprecated prefix; use ‘$extname.$name’ " .
+				    "instead");
+		}
+	} elsif (@$rs == 3) {
+		# TODO: Remove this warning (and simply ignore) in late 2022.
+		# tabbed.tabbedex-rs-prefix was not specified.  It’s default
+		# value used to be ‘tabbed’ so see if user might rely on that
+		# still being the case.
+		if (defined $root->x_resource("tabbed.$name")) {
+			$root->warn("ignoring ‘tabbed.$name’ resource; " .
+			            "use ‘$extname.$name’ instead");
 		}
 	}
 	defined $value ? $root->locale_decode($value) : $default
