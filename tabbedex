@@ -1061,8 +1061,7 @@ _on button_release => sub {
 
 {
 
-# TODO: Remove support for this some time in late 2021.  Perhaps leave warning
-# a bit longer though.
+# TODO: Remove warning in late 2022.
 my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
 
 my $matching_marks_warned = 0;
@@ -1073,10 +1072,10 @@ sub parse_single_timeout {
 		if (!$matching_marks_warned) {
 			$matching_marks_warned = 1;
 			$root->warn('automatic paren pairing in ',
-				    '‘tabbar-timeouts’ is deprecated');
+				    '‘tabbar-timeouts’ is no longer supported');
 		}
-		$root->warn('‘', $l, '’ won’t be matched with ‘', $r,
-		            '’ in the future');
+		$root->warn('‘', $l, '’ won’t be matched with ‘', $r, '’');
+		undef $r;
 	}
 	$l = $root->special_encode($l);
 	$r = defined $r ? $root->special_encode($r) : $l;
