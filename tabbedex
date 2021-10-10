@@ -348,13 +348,20 @@ makes I<Ctrl+T> start a new tab next to the current one.
 
 =item B<tabbedex:next_tab> and B<tabbedex:prev_tab>
 
-Switches to the tab on the right or left of the current tab.
+Switches to the tab on the right or left of the current tab.  Wraps around when
+switching right from the last tab or left from the first one.
+
+=item B<tabbedex:next_tab:nowrap> and B<tabbedex:prev_tab:nowrap>
+
+Switches tabs like B<tabbedex:next_tab> and B<tabbedex:prev_tab> action but does
+not perform wrapping.  I.e. does nothing if trying to switch to the last tab’s
+next tab or first tab’s previous tab.
 
 =item B<tabbedex:move_tab_left> and B<tabbedex:move_tab_right>
 
 Moves the current tab left or right.
 
-=item B<goto_tab_>I<N>
+=item B<tabbedex:goto_tab_>I<N>
 
 If I<N> is a positive integer, switches to the I<N>th tab.  If I<N> is negative,
 switches to the -I<N>th tab counting from the last one.
@@ -1301,10 +1308,11 @@ sub tab_action {
 			}
 			$root->new_tab($tab, $2, $index);
 		}
-	} elsif ($cmd eq 'next_tab') {
-		$root->make_current(($tab->index + 1) % @{ $root->{tabs} });
-	} elsif ($cmd eq 'prev_tab') {
-		$root->make_current($tab->index - 1);
+	} elsif ($cmd =~ /^(next|prev)_tab(:nowrap)?$/) {
+		my $index = $tab->index + ($1 eq 'next' ? 1 : -1);
+		if (!$2 || ($index >= 0 && $index < @{ $root->{tabs} })) {
+			$root->make_current($index % @{ $root->{tabs} });
+		}
 	} elsif ($cmd eq 'move_tab_left') {
 		$root->move_tab($tab, -1);
 	} elsif ($cmd eq 'move_tab_right') {
