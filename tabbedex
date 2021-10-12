@@ -355,12 +355,19 @@ switching right from the last tab or left from the first one.
 =item B<tabbedex:next_tab:nowrap> and B<tabbedex:prev_tab:nowrap>
 
 Switches tabs like B<tabbedex:next_tab> and B<tabbedex:prev_tab> action but does
-not perform wrapping.  I.e. does nothing if trying to switch to the last tab’s
-next tab or first tab’s previous tab.
+not wrap around.  I.e. does nothing if trying to switch to the last tab’s next
+tab or first tab’s previous tab.
 
 =item B<tabbedex:move_tab_left> and B<tabbedex:move_tab_right>
 
-Moves the current tab left or right.
+Moves the current tab left or right.  Wraps around when moving last tab right or
+first tab left.
+
+=item B<tabbedex:move_tab_left:nowrap> and B<tabbedex:move_tab_right:nowrap>
+
+Moves the current tab left or right like B<tabbedex:move_tab_left> and
+B<tabbedex:move_tab_right> but does not wrap around.  I.e. moving first tab left
+or last tab right does nothing.
 
 =item B<tabbedex:goto_tab_>I<N>
 
@@ -1314,10 +1321,8 @@ sub tab_action {
 		if (!$2 || ($index >= 0 && $index < @{ $root->{tabs} })) {
 			$root->make_current($index % @{ $root->{tabs} });
 		}
-	} elsif ($cmd eq 'move_tab_left') {
-		$root->move_tab($tab, -1);
-	} elsif ($cmd eq 'move_tab_right') {
-		$root->move_tab($tab, 1);
+	} elsif ($cmd =~ /^move_tab_(left|right)(:nowrap)?$/) {
+		$root->move_tab($tab, $1 eq 'left' ? -1 : 1, !!$2);
 	} elsif ($cmd =~ /^goto_tab[_:](-?)(0*[1-9]\d*)$/) {
 		if ($2 <= @{ $root->{tabs} }) {
 			$root->make_current($1 eq '' ? $2 - 1 : -$2);
@@ -1335,7 +1340,7 @@ sub tab_action {
 }
 
 sub move_tab {
-	my ($root, $tab, $direction) = @_;
+	my ($root, $tab, $direction, $nowrap) = @_;
 	if (@{ $root->{tabs} } < 2) {
 		return;
 	}
@@ -1344,15 +1349,18 @@ sub move_tab {
 	my $idx = $tab->index;
 
 	if ($idx == 0 && $direction == -1) {
+		if ($nowrap) {
+			return;
+		}
 		push @{$root->{tabs}}, shift @{$root->{tabs}};
-		$idx = $last;
 	} elsif ($idx == $last && $direction == 1) {
+		if ($nowrap) {
+			return;
+		}
 		unshift @{$root->{tabs}}, pop @{$root->{tabs}};
-		$idx = 0;
 	} else {
 		($root->{tabs}[$idx], $root->{tabs}[$idx + $direction]) =
 			($root->{tabs}[$idx + $direction], $root->{tabs}[$idx]);
-		$idx += $direction;
 	}
 	$root->refresh;
 }
