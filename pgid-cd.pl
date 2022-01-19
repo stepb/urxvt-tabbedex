@@ -49,10 +49,10 @@ in B<~/.urxvt/tabbedex-pgid-cd> one can use the following configuration:
     URxvt.tabbedex.tab-arguments: \
         -e %~/.urxvt/tabbedex-pgid-cd %p %E
 
-or if it's in B</usr/lib/urxvt/tabbadex-pgid-cd> then:
+or if it's in B</usr/lib/urxvt/tabbedex-pgid-cd> then:
 
     URxvt.tabbedex.tab-arguments: \
-        -e /usr/lib/urxvt/tabbadex-pgid-cd %p %E
+        -e /usr/lib/urxvt/tabbedex-pgid-cd %p %E
 
 Tabbedex will replace B<%p> sequence with an ID of a process in foreground of
 current tab such that command in the new tab will inherit current working

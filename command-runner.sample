@@ -54,7 +54,7 @@ To use this script in conjunction with B<pgid-cd.pl> tool also packaged with
 urxvt-tabbedex, the resource should be:
 
     URxvt.tabbedex.tab-arguments: \
-        -e /usr/lib/urxvt/tabbadex-pgid-cd %p \
+        -e /usr/lib/urxvt/tabbedex-pgid-cd %p \
         /bin/sh %~/.urxvt/command-runner.sh %n %e
 
 (modulo the actual location of the files).
