@@ -920,11 +920,26 @@ sub copy_properties {
                                                                $atom);
 
       # fix up size hints
-      if ($atom == $wm_normal_hints) {
+      if ($atom == $wm_normal_hints && $root->{tabheight}) {
+         # typedef struct {
+         #         long flags;                  /* 0 */
+         #         int x, y;                    /* 1, 2 */ /* Obsolete */
+         #         int width, height;           /* 3, 4 */ /* Obsolete */
+         #         int min_width, min_height;   /* 5, 6 */
+         #         int max_width, max_height;   /* 7, 8 */
+         #         int width_inc, height_inc;   /* 9, 10 */
+         #         struct {
+         #                 int x; /* numerator */
+         #                 int y; /* denominator */
+         #         } min_aspect, max_aspect;    /* 11, 12, 13, 14 */
+         #         int base_width, base_height; /* 15, 16 */
+         #         int win_gravity;             /* 17 */
+         # } XSizeHints;
+         #
+         # (Don’t ask me how this works with long and int types.  Somehow it
+         # does – mina86).
          my (@hints) = unpack "l!*", $items;
-
          $hints[$_] += $root->{tabheight} for (4, 6, 16);
-
          $items = pack "l!*", @hints;
       }
 
@@ -1122,11 +1137,14 @@ sub init {
    $root->{resource} = [map $root->resource ("+$_"),
                             0 .. urxvt::NUM_RESOURCES - 1];
 
+   $root->{hpadding} = $root->{vpadding} = 2 * $root->int_bwidth;
    $root->resource (int_bwidth => 0);
    $root->resource (pty_fd => -1);
 
    if (defined(my $key = $urxvt::OPTION{scrollBar})) {
-      $root->{option}{$key} = $root->option($key, 0);
+      if ($root->{option}{$key} = $root->option($key, 0)) {
+         $root->{hpadding} += $root->get_scrollbar_thickness;
+      }
    }
    # Disable ‘intensityStyles’ so that bold, blink etc. specified in tabbar
    # styles don’t affect the colours.
@@ -1162,12 +1180,68 @@ sub init {
    $root->{timer} = urxvt::timer->new->cb ( sub { $root->refresh; } );
 }
 
+# Figures out the thickness of scroll bar.  This is based on scrollBar_t::setup
+# code and written with the assumption that urxvt was compiled with all styles
+# enabled.
+sub get_scrollbar_thickness {
+	my ($root) = @_;
+
+	my $style = $root->resource('scrollstyle') || '';
+	my $width;
+
+	if ($style =~ /^next/i) {
+		$style = 'next';
+		$width = 19;  # SB_WIDTH_NEXT
+	} elsif ($style =~ /^xterm/i) {
+		$width = 15;  # SB_STYLE_XTERM
+	} elsif ($style =~ /^plain/i) {
+		$width = 7;  # SB_WIDTH_PLAIN
+	} else {
+		$style = 'rxvt';
+		$width = 10;  # SB_WIDTH_RXVT
+	}
+
+	# Relevant excerpt from the C++ code:
+	#
+	#  thickness = term->rs[Rs_scrollBar_thickness];
+	#  if (style != SB_STYLE_NEXT)	/* dishonour request - for now */
+	#    if (thickness && (i = atoi (thickness)) >= SB_WIDTH_MINIMUM)
+	#      width = min (i, SB_WIDTH_MAXIMUM);
+	if ($style ne 'next') {
+		my $thickness = $root->resource('scrollBar_thickness');
+		if ($thickness && $thickness >= 5) {
+			# SB_WIDTH_MAXIMUM == 100
+			$width = $thickness < 100 ? $thickness : 100;
+		}
+	}
+
+	my $key = $urxvt::OPTION{scrollBar_floating};
+	if ($style eq 'rxvt' && defined $key && !$root->option($key)) {
+		$width += 2;
+	}
+
+	$width
+}
+
 _on start => sub {
    my ($root) = @_;
 
    $root->{maxtabheight} =
       $root->int_bwidth + $root->fheight + $root->lineSpace;
    $root->{tabheight} = $root->{autohide} ? 0 : $root->{maxtabheight};
+
+   # Root window is always created without scroll bar or border which means that
+   # it’s sized without any space allocated for those elements.  However, tabs
+   # may have those options enabled which makes means that they end up with less
+   # usable space than user requested. To account for that, enlarge the root to
+   # make space for the border and scroll bar.
+   my $hpadding = delete $root->{hpadding};
+   my $vpadding = delete $root->{vpadding};
+   if ($hpadding || $vpadding || $root->{tabheight}) {
+      my $w = $root->width + $hpadding;
+      my $h = $root->height + $vpadding + $root->{tabheight};
+      $root->XMoveResizeWindow($root->parent, 0, 0, $w, $h);
+   }
 
    $root->cmd_parse(delete $root->{init_cmd});
 
