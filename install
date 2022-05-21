@@ -1,0 +1,69 @@
+#!/bin/sh
+# tabbedex install script
+
+# Wrap everything in a function so we don’t have to worry about connection
+# dropping in the middle of the stream.  This makes ‘curl … | sh’ as well as
+# updating the install script while it is running safe.
+_() {
+
+url=https://github.com/mina86/urxvt-tabbedex
+
+set -eu
+
+if [ -e ~/.urxvt/tabbedex ]; then
+	printf >&2 '~/.urxvt/tabbedex already exist, overwrite? [y/N] '
+	if ! read ans || [ "$ans" != y ]; then
+		echo >&2 'Aborting'
+		exit 1
+	fi
+fi
+
+log () {
+	echo >&2
+	echo "$*" >&2
+}
+
+git=$(which git 2>/dev/null) || true
+
+if [ -z "$git" ]; then
+	log 'Downloading and extracting the package to ~/.urxvt/tabbedex'
+	mkdir -p ~/.urxvt/tabbedex && cd ~/.urxvt/tabbedex
+	curl -L "$url/archive/master.tar.gz" |
+		tar vzx --exclude=.gitignore --strip-components=1
+
+elif [ -e ~/.urxvt/tabbedex/.git ]; then
+	log 'Updating the repository'
+	cd ~/.urxvt/tabbedex
+	git remote update
+	git reset --hard origin/master
+
+else
+	if [ -e ~/.urxvt/tabbedex ]; then
+		log 'Deleting ~/.urxvt/tabbedex'
+		rm -rf -- ~/.urxvt/tabbedex
+	fi
+	log 'Cloning the repository to ~/.urxvt/tabbedex'
+	mkdir -p ~/.urxvt
+	git clone "$url" ~/.urxvt/tabbedex
+	cd ~/.urxvt/tabbedex
+fi
+
+case "$(id -u)" in
+0)
+	log 'Running as super user, installing globally.'
+	make install
+	;;
+
+*)
+	log 'Running as regular user, installing symbolic links locally'
+	make install-local-symlink
+esac
+
+log 'You can re-run this script to update the extension.'
+
+# Exit so that if this script got longer (if user run it from the repository),
+# shell will not try to execute anything past its cursor in the file.
+exit
+}
+
+_
