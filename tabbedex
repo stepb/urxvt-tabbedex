@@ -1091,22 +1091,8 @@ _on button_release => sub {
 
 {
 
-# TODO: Remove warning in late 2022.
-my %matching_marks = ('[' => ']', '{' => '}', '(' => ')', '<' => '>');
-
-my $matching_marks_warned = 0;
-
 sub parse_single_timeout {
 	my ($root, $t, $l, $r) = @_;
-	if (!defined $r && defined($r = $matching_marks{$l})) {
-		if (!$matching_marks_warned) {
-			$matching_marks_warned = 1;
-			$root->warn('automatic paren pairing in ',
-				    '‘tabbar-timeouts’ is no longer supported');
-		}
-		$root->warn('‘', $l, '’ won’t be matched with ‘', $r, '’');
-		undef $r;
-	}
 	$l = $root->special_encode($l);
 	$r = defined $r ? $root->special_encode($r) : $l;
 	[$t + 0, $l, $r]
@@ -1118,9 +1104,6 @@ sub parse_timeouts {
 	my @timeouts;
 	while ($timeouts =~ /\G(\d*\.\d+|\d+):($char)($char)?(?::|$)/g) {
 		push @timeouts, $root->parse_single_timeout($1, $2, $3);
-	}
-	if ($matching_marks_warned) {
-		$root->warn('specify characters pairs explicitly instead');
 	}
 	@timeouts = sort { $b->[0] <=> $a->[0] } @timeouts;
 	if (!@timeouts || $timeouts[$#timeouts][0] > 0) {
