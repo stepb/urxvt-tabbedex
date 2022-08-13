@@ -355,8 +355,8 @@ switching right from the last tab or left from the first one.
 =item B<tabbedex:next_tab:nowrap> and B<tabbedex:prev_tab:nowrap>
 
 Switches tabs like B<tabbedex:next_tab> and B<tabbedex:prev_tab> action but does
-not wrap around.  I.e. does nothing if trying to switch to the last tab’s next
-tab or first tab’s previous tab.
+not wrap around.  I.e. does nothing if trying to switch to the last tab's next
+tab or first tab's previous tab.
 
 =item B<tabbedex:move_tab_left> and B<tabbedex:move_tab_right>
 
