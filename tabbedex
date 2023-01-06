@@ -367,9 +367,9 @@ Start renaming the tab.
 
 =head1 OSC SEQUENCES
 
-tabbedex supports a single OSC sequence which can be invoked by programs running
-in the terminal by writing a special sequence, namely I<ESC ] 777 ; string ST>
-where I<string> is the command to execute.  For example:
+tabbedex supports two OSC sequences.  They can be invoked by programs running in
+the terminal by writing an OSC sequence I<ESC ] 777 ; string ST> where I<string>
+is the command to execute.  For example:
 
     printf '\033]777;tabbedex;set_tab_name;%s\007' "foo"
 
